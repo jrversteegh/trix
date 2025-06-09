@@ -1,0 +1,67 @@
+[tool.poetry]
+name = "trix"
+version = "0.1.0"
+description = "Library for working with matrices"
+authors = ["Jaap Versteegh <j.r.versteegh@gmail.com>"]
+license = "BSD"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[tool.poetry.group.dev.dependencies]
+invoke = "^2.2.0"
+cmake = "^4.0.2"
+sphinx = "^8.2.3"
+sphinx-rtd-theme = "^3.0.2"
+conan = "^2.17.0"
+breathe = "^4.36.0"
+gitpython = "^3.1.44"
+isort = "^6.0.1"
+black = "^25.1.0"
+ipython = "^9.3.0"
+pytest = "^8.4.0"
+gcovr = "^8.3"
+pytest-cov = "^6.1.1"
+clang-format = "^20.1.5"
+pybind11 = "^2.13.6"
+tomli = "^2.2.1"
+setuptools = "^80.9.0"
+
+[tool.poetry.extras]
+docs = ["Sphinx"]
+
+[tool.black]
+extend_exclude = ''
+
+[tool.isort]
+profile = "black"
+known_first_party = ["trix"]
+skip = ["__init__.py"]
+extend_skip_glob = ["venv", ".venv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = """\
+    --cov-report=term-missing:skip-covered \
+    --cov-report=html \
+    --cov-report=xml \
+    """
+filterwarnings = "ignore::DeprecationWarning"
+
+[tool.coverage]
+run = { source = ["trix"], branch = true, omit = [] }
+html = { directory = "build/pytest_coverage" }
+xml = { output = "build/pytest_coverage.xml" }
+
+
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = true
+
+
+[build-system]
+requires = ["poetry-core", "setuptools", "wheel", "cmake", "tomli", "gitpython", "conan"]
+build-backend = "poetry.core.masonry.api"
+

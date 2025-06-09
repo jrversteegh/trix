@@ -11,4 +11,4 @@ set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
-add_executable(mtrx src/matrix.cpp)
+add_library(mtrx src/matrix.cpp)
