@@ -8,6 +8,7 @@
 /CMakeSettings.json
 /CMakeUserPresets.json
 /src/trix/*.so
+/src/trixx/*.so
 
 __pycache__
 *.pyc

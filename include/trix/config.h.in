@@ -1,0 +1,26 @@
+/**
+ * \file
+ * \brief Provide program compilation configuration
+ *
+ * \author J.R. Versteegh <j.r.versteegh@gmail.com>
+ *
+ * Build configuration
+ */
+
+/*
+ * Conditional includes and definitions of optional packages here
+ */
+
+#cmakedefine NUMBER_FORMAT @NUMBER_FORMAT@
+
+#ifdef NUMBER_FORMAT
+#if (NUMBER_FORMAT == double)
+  using Number = double;
+#elif (NUMBER_FORMAT == float)
+  using Number = float;
+#else
+#error "Unexpected number format"
+#endif
+#else
+  using Number = double;
+#endif
