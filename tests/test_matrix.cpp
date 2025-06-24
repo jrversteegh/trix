@@ -175,6 +175,55 @@ BOOST_FIXTURE_TEST_CASE(matrix_symmetric_subtract, SymmetricMatrixFixture) {
   do_cross_test(test, square, symmetric, square_zero, symmetric_zero);
 };
 
+struct DiagonalMatrixFixture {
+  IdentityMatrix<3> identity{};
+  DiagonalMatrix<3> diagonal_identity{1.0, 1.0, 1.0};
+  DiagonalMatrix<3> triple_identity{3.0, 3.0, 3.0};
+  Matrix<3, 3> square_identity{
+    1.0, 0.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 0.0, 1.0,
+  };
+
+  DiagonalMatrix<3> diagonal{1.0, 2.0, 3.0};
+  Matrix<3> symmetric{
+    1.0,
+    2.0, 2.0,
+    3.0, 4.0, 3.0,
+  };
+  Matrix<3, 3> square_asymmetric{
+    1.0, 2.0, 4.0,
+    2.0, 2.0, 4.0,
+    3.0, 4.0, 3.0,
+  };
+};
+
+BOOST_FIXTURE_TEST_CASE(diagonal_equality, DiagonalMatrixFixture) {
+  BOOST_TEST(diagonal_identity == identity);
+  BOOST_TEST(diagonal_identity == square_identity);
+  BOOST_TEST(identity == square_identity);
+  BOOST_TEST(diagonal != diagonal_identity);
+  BOOST_TEST(diagonal != square_asymmetric);
+  BOOST_TEST(diagonal != symmetric);
+};
+
+BOOST_FIXTURE_TEST_CASE(diagonal_scalar_multiply, DiagonalMatrixFixture) {
+  auto r1 = identity * 3.0;
+  auto r2 = 3.0 * identity;
+  auto r3 = diagonal_identity * 3.0;
+  auto r4 = 3.0 * diagonal_identity;
+  BOOST_TEST(r1 == triple_identity);
+  BOOST_TEST(r2 == triple_identity);
+  BOOST_TEST(r3 == triple_identity);
+  BOOST_TEST(r4 == triple_identity);
+};
+
+BOOST_FIXTURE_TEST_CASE(diagonal_addition, DiagonalMatrixFixture) {
+  auto r1 = diagonal_identity + diagonal_identity + diagonal_identity;
+  auto r2 = identity + identity + identity;
+  BOOST_TEST(r1 == triple_identity);
+  BOOST_TEST(r2 == triple_identity);
+};
 
 
 ut::test_suite* init_unit_test_suite(int, char*[]) {
