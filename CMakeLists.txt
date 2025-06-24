@@ -1,11 +1,14 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.28)
 
-project(libmtrx)
+project(trix)
 
-set (CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wfatal-errors")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+set(CMAKE_CXX_SCAN_FOR_MODULES TRUE)
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -54,6 +57,7 @@ add_compile_definitions(
 )
 
 FILE(GLOB lib_sources src/*.cpp)
+FILE(GLOB module_sources src/*.cppm)
 
 add_library(trix OBJECT ${lib_sources})
 message("Module output directory: ${MODULE_OUTPUT_DIR}")
@@ -68,6 +72,7 @@ set_target_properties(trix_static PROPERTIES OUTPUT_NAME trix)
 if(BUILD_PYTHON)
   pybind11_add_module(trixx MODULE ${TRIX_SOURCE_DIR}/trixx/binding.cpp ${lib_sources})
 endif()
+
 
 enable_testing()
 
@@ -99,6 +104,10 @@ if(BUILD_TESTS)
       Boost::log_setup
       Boost::unit_test_framework
       trix_static
+    )
+    target_sources(${NEW_TEST} PRIVATE 
+      FILE_SET cxx_modules TYPE CXX_MODULES
+      FILES ${module_sources}
     )
     add_test(${NEW_TEST} tests/${NEW_TEST})
   endmacro()
@@ -132,5 +141,6 @@ if(BUILD_TESTS)
   endmacro()
 
   new_test(test_matrix)
+  new_test(test_module)
   new_benchmark(test_performance)
 endif()

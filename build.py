@@ -67,6 +67,8 @@ def build_module(build_type, config=""):
         if os.system(
             f"{cmake} -DPYTHON_EXECUTABLE={python} -DCMAKE_BUILD_TYPE={build_type}"
             f" -DVERSION={version} -DDATE={date} -DBUILD_PYTHON=1 -DBUILD_TESTS=1 -DBUILD_SHARED=1"
+            f" -DCMAKE_CXX_COMPILER=g++-15"
+            f" -GNinja"
             f" -DCMAKE_TOOLCHAIN_FILE=conan/conan_toolchain.cmake {config} {win_flags} {script_dir}"
         ):
             raise Exception("Failed to configure with cmake")
