@@ -7,35 +7,8 @@ namespace ut = boost::unit_test;
 
 using namespace trix;
 
-/*
-UnitQuaternion uqs[] = {
-    UnitQuaternion{std::sqrt(0.5f), 0.5f, 0.5f, 0.0f},
-    UnitQuaternion{0.0f, std::sqrt(0.5f), 0.5f, 0.5f},
-    UnitQuaternion{0.0f, 0.5f, std::sqrt(0.5f), 0.5f},
-    UnitQuaternion{0.5f, 0.0f, 0.5f, std::sqrt(0.5f)},
-    UnitQuaternion{std::sqrt(0.5f), -0.5f, 0.5f, 0.0f},
-    UnitQuaternion{0.0f, std::sqrt(0.5f), -0.5f, 0.5f},
-    UnitQuaternion{0.0f, 0.5f, std::sqrt(0.5f), -0.5f},
-    UnitQuaternion{-0.5f, 0.0f, 0.5f, std::sqrt(0.5f)},
-    UnitQuaternion{-1.f * std::sqrt(0.5f), 0.5f, 0.5f, 0.0f},
-    UnitQuaternion{0.0f, -1.f * std::sqrt(0.5f), 0.5f, 0.5f},
-    UnitQuaternion{0.0f, 0.5f, -1.f * std::sqrt(0.5f), 0.5f},
-    UnitQuaternion{0.5f, 0.0f, 0.5f, -1.f * std::sqrt(0.5f)}};
 
-void test_qmq_conversion(UnitQuaternion q) {
-  RotationMatrix m{q};
-  UnitQuaternion result = static_cast<UnitQuaternion>(m);
-  BOOST_TEST((result == q || result == -q));
-}
-
-ut::test_suite* init_unit_test_suite(int, char*[]) {
-  ut::framework::master_test_suite().add(BOOST_PARAM_TEST_CASE(
-      &test_qmq_conversion, uqs, uqs + sizeof(uqs) / sizeof(uqs[0])));
-  return 0;
-}
-*/
-
-struct M {
+struct MatrixFixture {
   Matrix<3,4> m43{
     1.0, 2.0, 3.0, 4.0,
     2.0, 3.0, 4.0, 5.0,
@@ -61,21 +34,21 @@ struct M {
 };
 
 
-BOOST_FIXTURE_TEST_CASE(matrix_mul_test3, M) {
+BOOST_FIXTURE_TEST_CASE(matrix_mul_test3, MatrixFixture) {
   auto r = m43 * m34;
-  BOOST_TEST(r.row_count == 3);
-  BOOST_TEST(r.column_count == 3);
+  BOOST_TEST(r.rows == 3);
+  BOOST_TEST(r.columns == 3);
   BOOST_TEST(r == e33);
 };
 
-BOOST_FIXTURE_TEST_CASE(matrix_mul_test4, M) {
+BOOST_FIXTURE_TEST_CASE(matrix_mul_test4, MatrixFixture) {
   auto r = m34 * m43;
-  BOOST_TEST(r.row_count == 4);
-  BOOST_TEST(r.column_count == 4);
+  BOOST_TEST(r.rows == 4);
+  BOOST_TEST(r.columns == 4);
   BOOST_TEST(r == e44);
 };
 
-BOOST_FIXTURE_TEST_CASE(matrix_scalar_mul_test, M) {
+BOOST_FIXTURE_TEST_CASE(matrix_scalar_mul_test, MatrixFixture) {
   auto r1 = 2 * m34;
   auto r2 = m34 * 2;
   auto e = m34 + m34;
@@ -225,8 +198,42 @@ BOOST_FIXTURE_TEST_CASE(diagonal_addition, DiagonalMatrixFixture) {
   BOOST_TEST(r2 == triple_identity);
 };
 
+BOOST_FIXTURE_TEST_CASE(diagonal_multiplication, DiagonalMatrixFixture) {
+  auto r1 = diagonal_identity * diagonal_identity;
+  static_assert(std::is_same_v<decltype(r1), decltype(diagonal_identity)>, "Expected result of diagonal multiplication to be diagonal");
+  BOOST_TEST(r1 == diagonal_identity);
+};
+
+BOOST_FIXTURE_TEST_CASE(matrix_transpose, MatrixFixture) {
+  BOOST_TEST(m43.transpose() == m34);
+  BOOST_TEST((m43 * m43.transpose()) == (m43 * m34));
+  BOOST_TEST((m34 + m43.transpose()) == (2 * m34));
+}
+
 
 ut::test_suite* init_unit_test_suite(int, char*[]) {
+/*
+UnitQuaternion uqs[] = {
+    UnitQuaternion{std::sqrt(0.5f), 0.5f, 0.5f, 0.0f},
+    UnitQuaternion{0.0f, std::sqrt(0.5f), 0.5f, 0.5f},
+    UnitQuaternion{0.0f, 0.5f, std::sqrt(0.5f), 0.5f},
+    UnitQuaternion{0.5f, 0.0f, 0.5f, std::sqrt(0.5f)},
+    UnitQuaternion{std::sqrt(0.5f), -0.5f, 0.5f, 0.0f},
+    UnitQuaternion{0.0f, std::sqrt(0.5f), -0.5f, 0.5f},
+    UnitQuaternion{0.0f, 0.5f, std::sqrt(0.5f), -0.5f},
+    UnitQuaternion{-0.5f, 0.0f, 0.5f, std::sqrt(0.5f)},
+    UnitQuaternion{-1.f * std::sqrt(0.5f), 0.5f, 0.5f, 0.0f},
+    UnitQuaternion{0.0f, -1.f * std::sqrt(0.5f), 0.5f, 0.5f},
+    UnitQuaternion{0.0f, 0.5f, -1.f * std::sqrt(0.5f), 0.5f},
+    UnitQuaternion{0.5f, 0.0f, 0.5f, -1.f * std::sqrt(0.5f)}};
+
+void test_qmq_conversion(UnitQuaternion q) {
+  RotationMatrix m{q};
+  UnitQuaternion result = static_cast<UnitQuaternion>(m);
+  BOOST_TEST((result == q || result == -q));
+}
+
+*/
 //  ut::framework::master_test_suite().add(BOOST_PARAM_TEST_CASE(
 //      &test_qmq_conversion, uqs, uqs + sizeof(uqs) / sizeof(uqs[0])));
   return 0;
