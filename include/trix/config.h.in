@@ -11,6 +11,9 @@
  * Conditional includes and definitions of optional packages here
  */
 
+#ifndef TRIX_CONFIG_H__
+#define TRIX_CONFIG_H__
+
 #cmakedefine NUMBER_FORMAT @NUMBER_FORMAT@
 
 #ifdef NUMBER_FORMAT
@@ -23,4 +26,15 @@
 #endif
 #else
   using Number = double;
+#endif
+
+namespace trix {
+
+using size_t = std::size_t;
+
+template <typename T>
+concept ScalarConcept = std::is_integral_v<T> || std::is_floating_point_v<T>;
+
+}
+
 #endif
