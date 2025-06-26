@@ -16,14 +16,32 @@ from setuptools.command import build_ext
 
 module_name = "trixx"
 
+if "CXX" in os.environ:
+    compiler = os.environ["CXX"]
+else:
+    compiler = "g++-15"
+
 on_windows = platform.system().startswith("Win")
-script_dir = Path(os.path.dirname(os.path.realpath(__file__)))
+script_dir = Path(__file__).absolute().parent
 source_dir = script_dir / "src" / "trixx"
 trixx_dir = source_dir
 build_dir = script_dir / "build"
 python = sys.executable
 python_dir = Path(os.path.dirname(python))
 cmake = python_dir / "cmake"
+
+
+def get_project_version_and_date():
+    pyproject_toml = script_dir / "pyproject.toml"
+    if not pyproject_toml.exists():
+        # For some reason, during install, poetry renames pyproject.toml to pyproject.tmp...
+        pyproject_toml = script_dir / "pyproject.tmp"
+
+    # Create header with version info
+    with open(pyproject_toml, "rb") as f:
+        project = tomli.load(f)
+        version = project["tool"]["poetry"]["version"]
+    return version, datetime.utcnow().strftime("%Y-%m-%d")
 
 
 @contextlib.contextmanager
@@ -40,19 +58,6 @@ def dir_context(new_dir):
         os.chdir(previous_dir)
 
 
-def get_project_version_and_date():
-    pyproject_toml = script_dir / "pyproject.toml"
-    if not pyproject_toml.exists():
-        # For some reason, during install, poetry renames pyproject.toml to pyproject.tmp...
-        pyproject_toml = script_dir / "pyproject.tmp"
-
-    # Create header with version info
-    with open(pyproject_toml, "rb") as f:
-        project = tomli.load(f)
-        version = project["tool"]["poetry"]["version"]
-    return version, datetime.utcnow().strftime("%Y-%m-%d")
-
-
 def build_module(build_type, config=""):
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
@@ -61,15 +66,15 @@ def build_module(build_type, config=""):
     version, date = get_project_version_and_date()
     with dir_context(build_dir):
         if os.system(
-            f"conan install -of conan --build missing -s build_type={build_type} {script_dir}"
+            f"conan install -of conan --build=missing -s build_type={build_type} {script_dir}/conanfile.txt"
         ):
             raise Exception("Failed to run conan")
         if os.system(
-            f"{cmake} -DPYTHON_EXECUTABLE={python} -DCMAKE_BUILD_TYPE={build_type}"
+            f"{cmake} -DCMAKE_BUILD_TYPE={build_type}"
             f" -DVERSION={version} -DDATE={date} -DBUILD_PYTHON=1 -DBUILD_TESTS=1 -DBUILD_SHARED=1"
-            f" -DCMAKE_CXX_COMPILER=g++-15"
-            f" -GNinja"
-            f" -DCMAKE_TOOLCHAIN_FILE=conan/conan_toolchain.cmake {config} {win_flags} {script_dir}"
+            f" -DCMAKE_CXX_COMPILER={compiler} -G Ninja"
+            f" -DCMAKE_TOOLCHAIN_FILE=conan/conan_toolchain.cmake"
+            f"{config} {win_flags} {script_dir}"
         ):
             raise Exception("Failed to configure with cmake")
         if os.system(f"{cmake} --build . {config_flag} --verbose --parallel 4"):

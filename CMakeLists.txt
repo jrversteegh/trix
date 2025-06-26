@@ -33,6 +33,8 @@ if(BUILD_TESTS)
   find_package(benchmark REQUIRED)
 endif()
 
+find_package(fmt 11.2.0 REQUIRED)
+
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GITREV)
 set(TRIX_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
 set(TRIX_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")

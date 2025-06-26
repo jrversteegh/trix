@@ -16,6 +16,8 @@
 
 #cmakedefine NUMBER_FORMAT @NUMBER_FORMAT@
 
+namespace trix {
+
 #ifdef NUMBER_FORMAT
 #if (NUMBER_FORMAT == double)
   using Number = double;
@@ -27,8 +29,6 @@
 #else
   using Number = double;
 #endif
-
-namespace trix {
 
 using size_t = std::size_t;
 

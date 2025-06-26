@@ -12,20 +12,6 @@ script_dir = Path(__file__).absolute().parent
 os.chdir(script_dir)
 
 
-def get_project_version_and_date():
-    pyproject_toml = script_dir / "pyproject.toml"
-    if not pyproject_toml.exists():
-        # For some reason, during install, poetry renames pyproject.toml to pyproject.tmp...
-        pyproject_toml = script_dir / "pyproject.tmp"
-
-    # Create header with version info
-    with open(pyproject_toml, "rb") as f:
-        project = tomli.load(f)
-        name = project["tool"]["poetry"]["name"]
-        version = project["tool"]["poetry"]["version"]
-    return name, version, datetime.utcnow().strftime("%Y-%m-%d")
-
-
 @task
 def format(ctx):
     """Run black and isort"""
@@ -76,7 +62,10 @@ def create_build_dir(ctx):
 @task(update_revision, create_build_dir)
 def build(ctx):
     """Build"""
-    for cmd in ("poetry build -vv",):
+    for cmd in (
+        "poetry build -vv",
+        "conan create . --build=missing",
+    ):
         ctx.run(cmd, echo=True)
 
 
