@@ -142,6 +142,7 @@ if(BUILD_TESTS)
     add_test(${NEW_BENCHMARK} benchmarks/${NEW_BENCHMARK})
   endmacro()
 
+  new_test(test_vector)
   new_test(test_matrix)
   new_test(test_module)
   new_benchmark(test_performance)

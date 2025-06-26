@@ -18,7 +18,7 @@ def format(ctx):
     for cmd in (
         "black .",
         "isort .",
-        # f"clang-format -i {' '.join(glob.glob('include/trix/*.h'))}",
+        f"clang-format -i {' '.join(glob.glob('include/trix/*.h'))}",
         f"clang-format -i {' '.join(glob.glob('src/*.cpp'))}",
         # f"clang-format -i {' '.join(glob.glob('tests/*.cpp'))}",
         "pandoc -s -o README.md README.rst",
@@ -37,8 +37,8 @@ def check(ctx):
 def test(ctx):
     """Run tests"""
     for cmd in (
-        "pytest --cov --junitxml=build/reports/tests.xml",
         "ctest --output-junit ctest_tests.xml --test-dir build",
+        "pytest --cov --junitxml=build/reports/tests.xml",
     ):
         ctx.run(cmd, echo=True)
 

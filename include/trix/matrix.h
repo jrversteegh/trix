@@ -15,24 +15,23 @@
 
 namespace trix {
 
-
 template <typename M>
 concept MatrixConcept = requires(M const m, size_t i, size_t j) {
   typename M::value_type;
   { m.operator[](i, j) } -> std::same_as<typename M::value_type>;
-  { m.rows } -> std::convertible_to<size_t>;
-  { m.columns } -> std::convertible_to<size_t>;
+  { M::rows } -> std::convertible_to<size_t>;
+  { M::columns } -> std::convertible_to<size_t>;
 };
 
 template <typename M>
-concept MutableMatrixConcept = MatrixConcept<M> && requires(M m, size_t i, size_t j) {
-  { m.operator[](i, j) } -> std::same_as<typename M::value_type&>;
-};
+concept MutableMatrixConcept =
+    MatrixConcept<M> && requires(M m, size_t i, size_t j) {
+      { m.operator[](i, j) } -> std::same_as<typename M::value_type &>;
+    };
 
 struct MatrixType {};
 
-template <size_t N, size_t M, typename T>
-struct StorageType {
+template <size_t N, size_t M, typename T> struct StorageType {
   static constexpr size_t rows = N;
   static constexpr size_t columns = M;
   using value_type = T;
@@ -40,8 +39,7 @@ struct StorageType {
 
 struct RectangularBase {};
 
-template <size_t N, size_t M>
-struct RectangularType: RectangularBase {
+template <size_t N, size_t M> struct RectangularType : RectangularBase {
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t, size_t>, bool>
   constexpr bool for_each_element_while_true(F fun) const {
@@ -65,10 +63,9 @@ struct RectangularType: RectangularBase {
   }
 };
 
-struct SymmetricBase: RectangularBase {};
+struct SymmetricBase : RectangularBase {};
 
-template <size_t N>
-struct SymmetricType: SymmetricBase {
+template <size_t N> struct SymmetricType : SymmetricBase {
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t, size_t>, bool>
   constexpr bool for_each_element_while_true(F fun) const {
@@ -92,10 +89,9 @@ struct SymmetricType: SymmetricBase {
   }
 };
 
-struct DiagonalBase: SymmetricBase {};
+struct DiagonalBase : SymmetricBase {};
 
-template <size_t N>
-struct DiagonalType: DiagonalBase {
+template <size_t N> struct DiagonalType : DiagonalBase {
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t, size_t>, bool>
   constexpr bool for_each_element_while_true(F fun) const {
@@ -115,25 +111,30 @@ struct DiagonalType: DiagonalBase {
   }
 };
 
-
-template <typename STORAGE, size_t N, size_t M, size_t SIZE, typename T = Number>
-struct ArrayStorage : StorageType<N, M, T> {
+template <typename STORAGE, size_t N, size_t M, size_t SIZE,
+          typename T = Number>
+struct MatrixArrayStorage : StorageType<N, M, T> {
   static constexpr size_t elements = SIZE;
+  constexpr MatrixArrayStorage() = default;
+  constexpr MatrixArrayStorage(MatrixArrayStorage const &) = default;
+  constexpr MatrixArrayStorage(MatrixArrayStorage &&) = default;
   template <std::convertible_to<T>... Values>
-  constexpr ArrayStorage(Values... values) : m_{values...} {};
-  constexpr ArrayStorage(ArrayStorage const&) = default;
-  constexpr ArrayStorage(ArrayStorage&&) = default;
+  constexpr MatrixArrayStorage(Values &&...values)
+      : a_{std::forward<Values>(values)...} {};
+  constexpr MatrixArrayStorage(std::array<T, elements> &&array)
+      : a_{std::forward(array)} {}
   constexpr T operator[](const size_t i, const size_t j) const {
-    return m_[check_and_get_offset_(i, j)];
+    return a_[check_and_get_offset_(i, j)];
   }
   constexpr T &operator[](const size_t i, const size_t j) {
-    return m_[check_and_get_offset_(i, j)];
+    return a_[check_and_get_offset_(i, j)];
   }
   constexpr size_t size() const { return elements; }
 
 private:
-  std::array<T, elements> m_{};
-  static constexpr size_t check_and_get_offset_(const size_t i, const size_t j) {
+  std::array<T, elements> a_{};
+  static constexpr size_t check_and_get_offset_(const size_t i,
+                                                const size_t j) {
     size_t offset = STORAGE::get_offset(i, j);
     assert(offset < elements);
     return offset;
@@ -141,30 +142,37 @@ private:
 };
 
 template <size_t N, size_t M, typename T = Number>
-struct GenericStorage : ArrayStorage<GenericStorage<N, M, T>, N, M, N * M, T>, RectangularType<N, M> {
-  using ArrayStorage<GenericStorage<N, M, T>, N, M, N * M, T>::ArrayStorage;
+struct GenericStorage
+    : MatrixArrayStorage<GenericStorage<N, M, T>, N, M, N * M, T>,
+      RectangularType<N, M> {
+  using MatrixArrayStorage<GenericStorage<N, M, T>, N, M, N * M,
+                           T>::MatrixArrayStorage;
   static constexpr size_t get_offset(const size_t i, const size_t j) {
     return i * M + j;
   }
-
 };
 
-template <size_t N, size_t M=N, typename T = Number>
-requires (M == N)
-struct SymmetricStorage : ArrayStorage<SymmetricStorage<N, M, T>, N, M, N * (N + 1) / 2, T>, SymmetricType<N> {
-  using ArrayStorage<SymmetricStorage<N, M, T>, N, M, N * (N + 1) / 2, T>::ArrayStorage;
+template <size_t N, size_t M = N, typename T = Number>
+  requires(M == N)
+struct SymmetricStorage
+    : MatrixArrayStorage<SymmetricStorage<N, M, T>, N, M, N *(N + 1) / 2, T>,
+      SymmetricType<N> {
+  using MatrixArrayStorage<SymmetricStorage<N, M, T>, N, M, N *(N + 1) / 2,
+                           T>::MatrixArrayStorage;
   static constexpr size_t get_offset(const size_t i, const size_t j) {
     return i > j ? i * (i + 1) / 2 + j : j * (j + 1) / 2 + i;
   }
-
 };
 
-template <size_t N, size_t M=N, typename T = Number>
-requires (M == N)
-struct DiagonalStorage : ArrayStorage<DiagonalStorage<N, M, T>, N, M, N, T>, DiagonalType<N> {
-  using Base =ArrayStorage<DiagonalStorage<N, M, T>, N, M, N, T>;
+template <size_t N, size_t M = N, typename T = Number>
+  requires(M == N)
+struct DiagonalStorage
+    : MatrixArrayStorage<DiagonalStorage<N, M, T>, N, M, N, T>,
+      DiagonalType<N> {
+  using Base = MatrixArrayStorage<DiagonalStorage<N, M, T>, N, M, N, T>;
   using Base::Base;
-  static constexpr size_t get_offset(const size_t i, [[maybe_unused]] const size_t j) {
+  static constexpr size_t get_offset(const size_t i,
+                                     [[maybe_unused]] const size_t j) {
     return i;
   }
   constexpr T operator[](const size_t i, const size_t j) const {
@@ -191,12 +199,13 @@ struct DiagonalStorage : ArrayStorage<DiagonalStorage<N, M, T>, N, M, N, T>, Dia
       fun(i, i);
     }
   }
+
 private:
   T zero_;
 };
 
-template <size_t N, size_t M=N, typename T = Number>
-requires (M == N)
+template <size_t N, size_t M = N, typename T = Number>
+  requires(M == N)
 struct IdentityStorage : DiagonalType<N>, StorageType<N, N, T> {
   static constexpr size_t rows = N;
   static constexpr size_t columns = N;
@@ -205,22 +214,23 @@ struct IdentityStorage : DiagonalType<N>, StorageType<N, N, T> {
   }
 };
 
-template <size_t N, size_t M=N, typename T = Number,
+template <size_t N, size_t M = N, typename T = Number,
           template <size_t, size_t, typename C> typename Storage =
               GenericStorage>
-requires (N > 0 && M > 0)
+  requires(N > 0 && M > 0)
 struct Matrix : Storage<N, M, T>, MatrixType {
   using Storage<N, M, T>::Storage;
-  constexpr Matrix(Matrix const&) = default;
-  constexpr Matrix(Matrix&&) = default;
+  constexpr Matrix(Matrix const &) = default;
+  constexpr Matrix(Matrix &&) = default;
   template <MatrixConcept OTHER>
-  constexpr Matrix(OTHER const& other): Storage<OTHER::rows, OTHER::columns, typename OTHER::value_type>{} {
+  constexpr Matrix(OTHER const &other)
+      : Storage<OTHER::rows, OTHER::columns, typename OTHER::value_type>{} {
     this->for_each_element(
         [this, &other](size_t i, size_t j) { (*this)[i, j] = other[i, j]; });
   }
 
   template <MatrixConcept OTHER>
-  requires (OTHER::rows == N && OTHER::columns == M)
+    requires(OTHER::rows == N && OTHER::columns == M)
   constexpr Matrix &operator+=(OTHER const &other) {
     this->for_each_element(
         [this, &other](size_t i, size_t j) { (*this)[i, j] += other[i, j]; });
@@ -228,7 +238,7 @@ struct Matrix : Storage<N, M, T>, MatrixType {
   }
 
   template <MatrixConcept OTHER>
-  requires (OTHER::rows == N && OTHER::columns == M)
+    requires(OTHER::rows == N && OTHER::columns == M)
   constexpr Matrix &operator-=(OTHER const &other) {
     this->for_each_element(
         [this, &other](size_t i, size_t j) { (*this)[i, j] -= other[i, j]; });
@@ -249,7 +259,7 @@ struct Matrix : Storage<N, M, T>, MatrixType {
   }
 
   template <MatrixConcept OTHER>
-  requires (OTHER::rows == N && OTHER::columns == M)
+    requires(OTHER::rows == N && OTHER::columns == M)
   constexpr bool operator==(OTHER const &other) const {
     for (size_t i = 0; i < N; ++i) {
       for (size_t j = 0; j < M; ++j) {
@@ -259,31 +269,32 @@ struct Matrix : Storage<N, M, T>, MatrixType {
     }
     return true;
   }
-  static_assert(MatrixConcept<Matrix>, "Excepted Matrix to satisfy MatrixConcept");
+  static_assert(MatrixConcept<Matrix>,
+                "Excepted Matrix to satisfy MatrixConcept");
 
   struct Transpose {
     using value_type = T;
     static constexpr size_t rows = M;
     static constexpr size_t columns = N;
-    constexpr Transpose(Matrix& matrix): matrix_(matrix) {}
+    constexpr Transpose(Matrix &matrix) : matrix_(matrix) {}
     constexpr T operator[](const size_t i, const size_t j) const {
       return matrix_[j, i];
     }
     constexpr T &operator[](const size_t i, const size_t j) {
       return matrix_[j, i];
     }
-  private:
-    Matrix& matrix_;
-  };
-  static_assert(MatrixConcept<Transpose>, "Excepted Transpose to satisfy MatrixConcept");
 
-  constexpr Transpose& transpose() {
+  private:
+    Matrix &matrix_;
+  };
+  static_assert(MatrixConcept<Transpose>,
+                "Excepted Transpose to satisfy MatrixConcept");
+
+  constexpr Transpose &transpose() {
     static Transpose result{*this};
     return result;
   }
 };
-
-
 
 template <size_t N, typename T = Number>
 using SymmetricMatrix = Matrix<N, N, T, SymmetricStorage>;
@@ -294,55 +305,69 @@ using DiagonalMatrix = Matrix<N, N, T, DiagonalStorage>;
 template <size_t N, typename T = Number>
 using IdentityMatrix = Matrix<N, N, T, IdentityStorage>;
 
-
 template <MatrixConcept M1, MatrixConcept M2>
-requires (M1::rows == M2::rows && M1::columns == M2::columns)
+  requires(M1::rows == M2::rows && M1::columns == M2::columns)
 constexpr auto operator+(M1 const &m1, M2 const &m2) {
-  Matrix<M1::rows, M1::columns, std::common_type_t<typename M1::value_type, typename M2::value_type>> result{m1};
+  Matrix<M1::rows, M1::columns,
+         std::common_type_t<typename M1::value_type, typename M2::value_type>>
+      result{m1};
   result += m2;
   return result;
 }
 
 template <size_t N, typename T1, typename T2>
-constexpr auto operator+(SymmetricMatrix<N, T1> const &m1, SymmetricMatrix<N, T2> const &m2) {
+constexpr auto operator+(SymmetricMatrix<N, T1> const &m1,
+                         SymmetricMatrix<N, T2> const &m2) {
   SymmetricMatrix<N, std::common_type_t<T1, T2>> result{m1};
   result += m2;
   return result;
 }
 
-template <size_t N, typename T1, typename T2, template <size_t, size_t, typename> typename S1, template <size_t, size_t, typename> typename S2>
-requires std::derived_from<Matrix<N, N, T1, S1>, DiagonalBase> && std::derived_from<Matrix<N, N, T2, S2>, DiagonalBase>
-constexpr auto operator+(Matrix<N, N, T1, S1> const &m1, Matrix<N, N, T2, S2> const &m2) {
+template <size_t N, typename T1, typename T2,
+          template <size_t, size_t, typename> typename S1,
+          template <size_t, size_t, typename> typename S2>
+  requires std::derived_from<Matrix<N, N, T1, S1>, DiagonalBase> &&
+           std::derived_from<Matrix<N, N, T2, S2>, DiagonalBase>
+constexpr auto operator+(Matrix<N, N, T1, S1> const &m1,
+                         Matrix<N, N, T2, S2> const &m2) {
   DiagonalMatrix<N, std::common_type_t<T1, T2>> result{m1};
   result += m2;
   return result;
 }
 
 template <MatrixConcept M1, MatrixConcept M2>
-requires (M1::rows == M2::rows && M1::columns == M2::columns)
+  requires(M1::rows == M2::rows && M1::columns == M2::columns)
 constexpr auto operator-(M1 const &m1, M2 const &m2) {
-  Matrix<M1::rows, M1::columns, std::common_type_t<typename M1::value_type, typename M2::value_type>> result{m1};
+  Matrix<M1::rows, M1::columns,
+         std::common_type_t<typename M1::value_type, typename M2::value_type>>
+      result{m1};
   result -= m2;
   return result;
 }
 
 template <size_t N, typename T1, typename T2>
-constexpr auto operator-(SymmetricMatrix<N, T1> const &m1, SymmetricMatrix<N, T2> const &m2) {
+constexpr auto operator-(SymmetricMatrix<N, T1> const &m1,
+                         SymmetricMatrix<N, T2> const &m2) {
   SymmetricMatrix<N, std::common_type_t<T1, T2>> result{m1};
   result -= m2;
   return result;
 }
 
-template <size_t N, typename T1, typename T2, template <size_t, size_t, typename> typename S1, template <size_t, size_t, typename> typename S2>
-requires std::derived_from<Matrix<N, N, T1, S1>, DiagonalBase> && std::derived_from<Matrix<N, N, T2, S2>, DiagonalBase>
-constexpr auto operator-(Matrix<N, N, T1, S1> const &m1, Matrix<N, N, T2, S2> const &m2) {
+template <size_t N, typename T1, typename T2,
+          template <size_t, size_t, typename> typename S1,
+          template <size_t, size_t, typename> typename S2>
+  requires std::derived_from<Matrix<N, N, T1, S1>, DiagonalBase> &&
+           std::derived_from<Matrix<N, N, T2, S2>, DiagonalBase>
+constexpr auto operator-(Matrix<N, N, T1, S1> const &m1,
+                         Matrix<N, N, T2, S2> const &m2) {
   DiagonalMatrix<N, std::common_type_t<T1, T2>> result{m1};
   result -= m2;
   return result;
 }
 
-template <size_t N, size_t M, typename T, template <size_t, size_t, typename> typename S, ScalarConcept V>
-requires MutableMatrixConcept<Matrix<N, M, T, S>>
+template <size_t N, size_t M, typename T,
+          template <size_t, size_t, typename> typename S, ScalarConcept V>
+  requires MutableMatrixConcept<Matrix<N, M, T, S>>
 constexpr auto operator*(Matrix<N, M, T, S> const &m, V const value) {
   Matrix<N, M, T, S> result{m};
   result *= value;
@@ -350,7 +375,7 @@ constexpr auto operator*(Matrix<N, M, T, S> const &m, V const value) {
 }
 
 template <MatrixConcept M, ScalarConcept V>
-requires std::derived_from<DiagonalBase, M>
+  requires std::derived_from<DiagonalBase, M>
 constexpr auto operator*(M const &m, V const value) {
   DiagonalMatrix<M::rows, typename M::value_type> result{m};
   result *= value;
@@ -370,9 +395,11 @@ constexpr auto operator*(V const value, M const &m) {
 }
 
 template <MatrixConcept M1, MatrixConcept M2>
-requires (M1::columns == M2::rows)
+  requires(M1::columns == M2::rows)
 constexpr auto operator*(M1 const &m1, M2 const &m2) {
-  Matrix<M1::rows, M2::columns, std::common_type_t<typename M1::value_type, typename M2::value_type>> result;
+  Matrix<M1::rows, M2::columns,
+         std::common_type_t<typename M1::value_type, typename M2::value_type>>
+      result;
   for (size_t i = 0; i < M1::rows; ++i) {
     for (size_t j = 0; j < M2::columns; ++j) {
       result[i, j] = m1[i, 0] * m2[0, j];
@@ -385,7 +412,8 @@ constexpr auto operator*(M1 const &m1, M2 const &m2) {
 }
 
 template <size_t N, typename T1, typename T2>
-constexpr auto operator*(SymmetricMatrix<N, T1> const &m1, SymmetricMatrix<N, T2> const &m2) {
+constexpr auto operator*(SymmetricMatrix<N, T1> const &m1,
+                         SymmetricMatrix<N, T2> const &m2) {
   SymmetricMatrix<N, std::common_type_t<T1, T2>> result;
   for (size_t i = 0; i < N; ++i) {
     for (size_t j = 0; j <= i; ++j) {
@@ -399,7 +427,8 @@ constexpr auto operator*(SymmetricMatrix<N, T1> const &m1, SymmetricMatrix<N, T2
 }
 
 template <size_t N, typename T1, typename T2>
-constexpr auto operator*(DiagonalMatrix<N, T1> const &m1, DiagonalMatrix<N, T2> const &m2) {
+constexpr auto operator*(DiagonalMatrix<N, T1> const &m1,
+                         DiagonalMatrix<N, T2> const &m2) {
   DiagonalMatrix<N, std::common_type_t<T1, T2>> result;
   for (size_t i = 0; i < N; ++i) {
     result[i, i] = m1[i, i] * m2[i, i];
