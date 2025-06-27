@@ -9,6 +9,7 @@
 #include <random>
 #include <sstream>
 #include <type_traits>
+#include <utility>
 
 #include "config.h"
 
@@ -56,9 +57,6 @@ template <size_t N> struct FullVectorType {
 template <typename STORAGE, size_t N, size_t SIZE, typename T = Number>
 struct VectorArrayStorage : VectorStorageType<N, T>, FullVectorType<N> {
   static constexpr size_t elements = SIZE;
-  constexpr VectorArrayStorage() = default;
-  constexpr VectorArrayStorage(VectorArrayStorage const &) = default;
-  constexpr VectorArrayStorage(VectorArrayStorage &&) = default;
   template <std::convertible_to<T>... Values>
   constexpr VectorArrayStorage(Values &&...values)
       : a_{std::forward<Values>(values)...} {};
@@ -93,9 +91,8 @@ template <size_t N, typename T = Number,
           template <size_t, typename C> typename Storage = VectorGenericStorage>
   requires(N > 0)
 struct Vector : Storage<N, T>, VectorType {
+  using Indices = std::make_index_sequence<Storage<N, T>::elements>;
   using Storage<N, T>::Storage;
-  constexpr Vector(Vector const &) = default;
-  constexpr Vector(Vector &&) = default;
   template <VectorConcept OTHER>
     requires(OTHER::components >= Vector::components)
   constexpr Vector(OTHER const &other)
@@ -124,6 +121,8 @@ struct Vector : Storage<N, T>, VectorType {
     return *this;
   }
 
+  constexpr Vector operator-() const { return Vector{} - *this; }
+
   constexpr bool operator==(Vector const &other) const {
     return this->for_each_element_while_true(
         [this, &other](size_t i) -> bool { return (*this)[i] == other[i]; });
@@ -141,6 +140,12 @@ struct Vector : Storage<N, T>, VectorType {
   static_assert(VectorConcept<Vector>,
                 "Excepted Vector to satisfy VectorConcept");
 };
+
+template <typename C, typename... Cs>
+auto vector(C &&first, Cs &&...components) {
+  return Vector<sizeof...(Cs) + 1, C>{std::forward<C>(first),
+                                      std::forward<Cs>(components)...};
+}
 
 template <VectorConcept V1, VectorConcept V2>
   requires(V1::components == V2::components)

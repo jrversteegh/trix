@@ -56,6 +56,13 @@ BOOST_FIXTURE_TEST_CASE(vector4_vector4_add_test, VectorFixture) {
   BOOST_TEST(r == ea4);
 };
 
+BOOST_FIXTURE_TEST_CASE(vector3_negation_test, VectorFixture) {
+  auto r = -v3;
+  auto e = -1. * v3;
+  BOOST_TEST(r.components == 3);
+  BOOST_TEST(r == e);
+};
+
 ut::test_suite* init_unit_test_suite(int, char*[]) {
 /*
 UnitQuaternion uqs[] = {
