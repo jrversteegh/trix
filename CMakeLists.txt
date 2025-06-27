@@ -52,6 +52,7 @@ endif()
 include_directories(
   ${Boost_INCLUDE_DIR}
   ${pybind11_INCLUDE_DIR}
+  ${fmt_INCLUDE_DIR}
   ${TRIX_INCLUDE_DIR}
 )
 add_compile_definitions(

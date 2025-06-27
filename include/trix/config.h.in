@@ -15,6 +15,7 @@
 #define TRIX_CONFIG_H__
 
 #cmakedefine NUMBER_FORMAT @NUMBER_FORMAT@
+#cmakedefine FORMAT_STRING @FORMAT_STRING@
 
 namespace trix {
 
@@ -28,6 +29,11 @@ namespace trix {
 #endif
 #else
   using Number = double;
+#endif
+#ifdef FORMAT_STRING
+#define fmtstr FORMAT_STRING
+#else
+#define fmtstr "{:.4f}"
 #endif
 
 using size_t = std::size_t;

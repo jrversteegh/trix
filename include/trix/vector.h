@@ -11,6 +11,9 @@
 #include <type_traits>
 #include <utility>
 
+#include <fmt/format.h>
+#include <fmt/ranges.h>
+
 #include "config.h"
 
 namespace trix {
@@ -69,6 +72,7 @@ struct VectorArrayStorage : VectorStorageType<N, T>, FullVectorType<N> {
     return a_[check_and_get_offset_(i)];
   }
   constexpr size_t size() const { return elements; }
+  std::string str() const { return fmt::format(fmtstr, fmt::join(a_, ", ")); }
 
 private:
   std::array<T, elements> a_{};
@@ -91,8 +95,8 @@ template <size_t N, typename T = Number,
           template <size_t, typename C> typename Storage = VectorGenericStorage>
   requires(N > 0)
 struct Vector : Storage<N, T>, VectorType {
-  using Indices = std::make_index_sequence<Storage<N, T>::elements>;
   using Storage<N, T>::Storage;
+  constexpr static auto indices = std::make_index_sequence<N>{};
   template <VectorConcept OTHER>
     requires(OTHER::components >= Vector::components)
   constexpr Vector(OTHER const &other)
@@ -137,6 +141,7 @@ struct Vector : Storage<N, T>, VectorType {
     }
     return true;
   }
+
   static_assert(VectorConcept<Vector>,
                 "Excepted Vector to satisfy VectorConcept");
 };
@@ -199,11 +204,16 @@ constexpr auto operator*(V1 const &v1, V2 const &v2) {
   return result;
 }
 
+template <VectorConcept V1, VectorConcept V2>
+  requires(V1::components == 3 && V2::components == 3)
+constexpr auto cross(V1 const &v1, V2 const &v2) {
+  return vector(v1[1] * v2[2] - v1[2] * v2[1], v1[2] * v2[0] - v1[0] * v2[2],
+                v1[0] * v2[1] - v1[1] * v2[0]);
+}
+
 template <VectorConcept V>
 std::ostream &operator<<(std::ostream &out, V const &v) {
-  for (size_t i = 0; i < V::components; ++i) {
-    out << " " << v[i] << ",";
-  }
+  out << v.str();
   return out;
 }
 
