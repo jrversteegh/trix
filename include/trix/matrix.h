@@ -115,9 +115,6 @@ template <typename STORAGE, size_t N, size_t M, size_t SIZE,
           typename T = Number>
 struct MatrixArrayStorage : StorageType<N, M, T> {
   static constexpr size_t elements = SIZE;
-  constexpr MatrixArrayStorage() = default;
-  constexpr MatrixArrayStorage(MatrixArrayStorage const &) = default;
-  constexpr MatrixArrayStorage(MatrixArrayStorage &&) = default;
   template <std::convertible_to<T>... Values>
   constexpr MatrixArrayStorage(Values &&...values)
       : a_{std::forward<Values>(values)...} {};
@@ -220,10 +217,8 @@ template <size_t N, size_t M = N, typename T = Number,
   requires(N > 0 && M > 0)
 struct Matrix : Storage<N, M, T>, MatrixType {
   using Storage<N, M, T>::Storage;
-  constexpr Matrix(Matrix const &) = default;
-  constexpr Matrix(Matrix &&) = default;
   template <MatrixConcept OTHER>
-  constexpr Matrix(OTHER const &other)
+  explicit constexpr Matrix(OTHER const &other)
       : Storage<OTHER::rows, OTHER::columns, typename OTHER::value_type>{} {
     this->for_each_element(
         [this, &other](size_t i, size_t j) { (*this)[i, j] = other[i, j]; });

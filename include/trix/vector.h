@@ -63,7 +63,7 @@ struct VectorArrayStorage : VectorStorageType<N, T>, FullVectorType<N> {
   template <std::convertible_to<T>... Values>
   constexpr VectorArrayStorage(Values &&...values)
       : a_{std::forward<Values>(values)...} {};
-  constexpr VectorArrayStorage(std::array<T, elements> &&array)
+  explicit constexpr VectorArrayStorage(std::array<T, elements> &&array)
       : a_{std::forward(array)} {};
   constexpr T operator[](const size_t i) const {
     return a_[check_and_get_offset_(i)];
@@ -98,7 +98,7 @@ struct Vector : Storage<N, T>, VectorType {
   using Storage<N, T>::Storage;
   template <VectorConcept OTHER>
     requires(OTHER::components >= Vector::components)
-  constexpr Vector(OTHER const &other)
+  explicit constexpr Vector(OTHER const &other)
       : Storage<OTHER::components, typename OTHER::value_type>{} {
     this->for_each_element([this, &other](size_t i) { (*this)[i] = other[i]; });
   }
