@@ -300,6 +300,13 @@ using DiagonalMatrix = Matrix<N, N, T, DiagonalStorage>;
 template <size_t N, typename T = Number>
 using IdentityMatrix = Matrix<N, N, T, IdentityStorage>;
 
+template <typename C, typename... Cs>
+auto matrix(C &&first, Cs &&...components) {
+  constexpr size_t S = static_cast<size_t>(sqrt(sizeof...(Cs) + 1));
+  return Matrix<S, S, C>{std::forward<C>(first),
+                         std::forward<Cs>(components)...};
+}
+
 template <MatrixConcept M1, MatrixConcept M2>
   requires(M1::rows == M2::rows && M1::columns == M2::columns)
 constexpr auto operator+(M1 const &m1, M2 const &m2) {

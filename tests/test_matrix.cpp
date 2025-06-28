@@ -71,6 +71,7 @@ BOOST_FIXTURE_TEST_CASE(matrix_scalar_mul_test, MatrixFixture) {
 };
 
 
+
 struct SymmetricMatrixFixture {
 
   SymmetricMatrix<3> symmetric {
@@ -99,6 +100,15 @@ struct SymmetricMatrixFixture {
 
   SymmetricMatrix<3> symmetric_zero{};
   Matrix<3, 3> square_zero{};
+};
+
+BOOST_FIXTURE_TEST_CASE(matrix_construction_helper_test, SymmetricMatrixFixture) {
+  auto r = matrix(
+    1.0, 2.0, 3.0, 
+    2.0, 3.0, 4.0,
+    3.0, 4.0, 5.0 
+  );
+  BOOST_TEST(r == symmetric);
 };
 
 template <typename ARG1, typename ARG2>
