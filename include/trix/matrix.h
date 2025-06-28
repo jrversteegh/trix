@@ -436,6 +436,36 @@ constexpr auto operator*(DiagonalMatrix<N, T1> const &m1,
   return result;
 }
 
+template <MatrixConcept M, VectorConcept V,
+          typename T = std::common_type_t<typename M::value_type,
+                                          typename V::value_type>>
+  requires(M::columns == V::components)
+constexpr auto operator*(M const &m, V const &v) {
+  Vector<M::rows, T> result;
+  for (size_t i = 0; i < M::rows; ++i) {
+    result[i] = m[i, 0] * v[0];
+    for (size_t j = 1; j < V::components; ++j) {
+      result[i] += m[i, j] * v[j];
+    }
+  }
+  return result;
+}
+
+template <MatrixConcept M, VectorConcept V,
+          typename T = std::common_type_t<typename M::value_type,
+                                          typename V::value_type>>
+  requires(M::rows == V::components)
+constexpr auto operator*(V const &v, M const &m) {
+  Vector<M::columns, T> result;
+  for (size_t i = 0; i < M::columns; ++i) {
+    result[i] = v[0] * m[0, i];
+    for (size_t j = 1; j < V::components; ++j) {
+      result[i] += v[j] * m[j, i];
+    }
+  }
+  return result;
+}
+
 template <MatrixConcept M>
 std::ostream &operator<<(std::ostream &out, M const &m) {
   for (size_t i = 0; i < M::rows; ++i) {

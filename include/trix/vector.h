@@ -96,7 +96,6 @@ template <size_t N, typename T = Number,
   requires(N > 0)
 struct Vector : Storage<N, T>, VectorType {
   using Storage<N, T>::Storage;
-  constexpr static auto indices = std::make_index_sequence<N>{};
   template <VectorConcept OTHER>
     requires(OTHER::components >= Vector::components)
   constexpr Vector(OTHER const &other)

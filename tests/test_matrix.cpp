@@ -9,12 +9,12 @@ using namespace trix;
 
 
 struct MatrixFixture {
-  Matrix<3,4> m43{
+  Matrix<3,4> m34{
     1.0, 2.0, 3.0, 4.0,
     2.0, 3.0, 4.0, 5.0,
     3.0, 4.0, 5.0, 6.0,
   };
-  Matrix<4,3> m34{
+  Matrix<4,3> m43{
     1.0, 2.0, 3.0,
     2.0, 3.0, 4.0,
     3.0, 4.0, 5.0,
@@ -31,21 +31,35 @@ struct MatrixFixture {
     26.0, 38.0, 50.0, 62.0,
     32.0, 47.0, 62.0, 77.0,
   };
+  Vector<3> v3{1., 2., 3.};
+  Vector<4> v4{1., 2., 3., 4.};
 };
 
 
 BOOST_FIXTURE_TEST_CASE(matrix_mul_test3, MatrixFixture) {
-  auto r = m43 * m34;
+  auto r = m34 * m43;
   BOOST_TEST(r.rows == 3);
   BOOST_TEST(r.columns == 3);
   BOOST_TEST(r == e33);
 };
 
 BOOST_FIXTURE_TEST_CASE(matrix_mul_test4, MatrixFixture) {
-  auto r = m34 * m43;
+  auto r = m43 * m34;
   BOOST_TEST(r.rows == 4);
   BOOST_TEST(r.columns == 4);
   BOOST_TEST(r == e44);
+};
+
+BOOST_FIXTURE_TEST_CASE(matrix_vector_pre_mul, MatrixFixture) {
+  auto r = v4 * m43;
+  BOOST_TEST(r.elements == 3);
+  BOOST_TEST(r == vector(30., 40., 50.));
+};
+
+BOOST_FIXTURE_TEST_CASE(matrix_vector_post_mul, MatrixFixture) {
+  auto r = m34 * v4;
+  BOOST_TEST(r.elements == 3);
+  BOOST_TEST(r == vector(30., 40., 50.));
 };
 
 BOOST_FIXTURE_TEST_CASE(matrix_scalar_mul_test, MatrixFixture) {
