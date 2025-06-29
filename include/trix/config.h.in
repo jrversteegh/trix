@@ -20,16 +20,11 @@
 namespace trix {
 
 #ifdef NUMBER_FORMAT
-#if (NUMBER_FORMAT == double)
-  using Number = double;
-#elif (NUMBER_FORMAT == float)
-  using Number = float;
-#else
-#error "Unexpected number format"
-#endif
+  using Number = NUMBER_FORMAT;
 #else
   using Number = double;
 #endif
+
 #ifdef FORMAT_STRING
 #define fmtstr FORMAT_STRING
 #else
