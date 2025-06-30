@@ -65,7 +65,7 @@ BOOST_FIXTURE_TEST_CASE(vector3_negation_test, VectorFixture) {
 };
 
 BOOST_FIXTURE_TEST_CASE(vector3_str_test, VectorFixture) {
-  auto r = v3.str();
+  auto r = to_string(v3);
   BOOST_TEST(r == "1, 2, 3");
 };
 

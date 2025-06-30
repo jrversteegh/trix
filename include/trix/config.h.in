@@ -26,9 +26,9 @@ namespace trix {
 #endif
 
 #ifdef FORMAT_STRING
-#define fmtstr FORMAT_STRING
+#define trix_fmtstr FORMAT_STRING
 #else
-#define fmtstr "{}"
+#define trix_fmtstr "{}"
 #endif
 
 using size_t = std::size_t;

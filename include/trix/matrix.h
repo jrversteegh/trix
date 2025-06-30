@@ -7,6 +7,7 @@
 #include <functional>
 #include <ostream>
 #include <random>
+#include <ranges>
 #include <sstream>
 #include <type_traits>
 
@@ -31,7 +32,7 @@ concept MutableMatrixConcept =
 
 struct MatrixType {};
 
-template <size_t N, size_t M, typename T> struct StorageType {
+template <size_t N, size_t M, typename T> struct MatrixStorageType {
   static constexpr size_t rows = N;
   static constexpr size_t columns = M;
   using value_type = T;
@@ -113,7 +114,7 @@ template <size_t N> struct DiagonalType : DiagonalBase {
 
 template <typename STORAGE, size_t N, size_t M, size_t SIZE,
           typename T = Number>
-struct MatrixArrayStorage : StorageType<N, M, T> {
+struct MatrixArrayStorage : MatrixStorageType<N, M, T> {
   static constexpr size_t elements = SIZE;
   template <std::convertible_to<T>... Values>
   constexpr MatrixArrayStorage(Values &&...values)
@@ -203,7 +204,7 @@ private:
 
 template <size_t N, size_t M = N, typename T = Number>
   requires(M == N)
-struct IdentityStorage : DiagonalType<N>, StorageType<N, N, T> {
+struct IdentityStorage : DiagonalType<N>, MatrixStorageType<N, N, T> {
   static constexpr size_t rows = N;
   static constexpr size_t columns = N;
   constexpr T operator[](const size_t i, const size_t j) const {
@@ -267,21 +268,21 @@ struct Matrix : Storage<N, M, T>, MatrixType {
   static_assert(MatrixConcept<Matrix>,
                 "Excepted Matrix to satisfy MatrixConcept");
 
-  struct Transpose {
-    using value_type = T;
-    static constexpr size_t rows = M;
-    static constexpr size_t columns = N;
-    constexpr Transpose(Matrix &matrix) : matrix_(matrix) {}
+  struct View {
+    constexpr View(Matrix &m) : matrix(m) {};
+    Matrix &matrix;
+  };
+
+  struct Transpose : View, MatrixStorageType<M, N, T> {
+    using View::View;
     constexpr T operator[](const size_t i, const size_t j) const {
-      return matrix_[j, i];
+      return this->matrix[j, i];
     }
     constexpr T &operator[](const size_t i, const size_t j) {
-      return matrix_[j, i];
+      return this->matrix[j, i];
     }
-
-  private:
-    Matrix &matrix_;
   };
+
   static_assert(MatrixConcept<Transpose>,
                 "Excepted Transpose to satisfy MatrixConcept");
 
@@ -289,7 +290,66 @@ struct Matrix : Storage<N, M, T>, MatrixType {
     static Transpose result{*this};
     return result;
   }
+
+  struct Diagonal : View, VectorStorageType<std::min(N, M), T> {
+    using View::View;
+    constexpr T operator[](const size_t i) const { return this->matrix[i, i]; }
+  };
+  static_assert(VectorConcept<Diagonal>,
+                "Excepted Diagonal to satisfy VectorConcept");
+
+  constexpr Diagonal &diagonal() {
+    static Diagonal result{*this};
+    return result;
+  }
+
+  template <size_t S> struct RowColumnView {
+    constexpr RowColumnView(Matrix const &m, size_t i) : matrix(m), index(i) {
+      assert(i < S);
+    };
+    Matrix const &matrix;
+    size_t index;
+  };
+
+  struct Row : RowColumnView<N>, VectorStorageType<M, T> {
+    using RowColumnView<N>::RowColumnView;
+    constexpr T operator[](const size_t i) const {
+      return this->matrix[this->index, i];
+    }
+  };
+  static_assert(VectorConcept<Row>, "Excepted Row to satisfy VectorConcept");
+
+  constexpr Row &row(size_t const i) const {
+    static Row result{*this, i};
+    return result;
+  }
+
+  struct Column : RowColumnView<M>, VectorStorageType<N, T> {
+    using RowColumnView<M>::RowColumnView;
+    constexpr T operator[](const size_t i) const {
+      return this->matrix[i, this->index];
+    }
+  };
+  static_assert(VectorConcept<Column>,
+                "Excepted Column to satisfy VectorConcept");
+
+  constexpr Column &column(size_t const i) const {
+    static Column result{*this, i};
+    return result;
+  }
 };
+
+template <MatrixConcept M> constexpr auto to_string(M const &m) {
+  std::array<std::string, M::rows> lines{};
+  for (size_t i = 0; i < M::rows; ++i) {
+    std::vector<typename M::value_type> values{};
+    for (size_t j = 0; j < M::columns; ++j) {
+      values.push_back(m[i, j]);
+    }
+    lines[i] = fmt::format(trix_fmtstr, fmt::join(values, ", "));
+  }
+  return fmt::format("{}", fmt::join(lines, "\n"));
+}
 
 template <size_t N, typename T = Number>
 using SymmetricMatrix = Matrix<N, N, T, SymmetricStorage>;
@@ -470,12 +530,7 @@ constexpr auto operator*(V const &v, M const &m) {
 
 template <MatrixConcept M>
 std::ostream &operator<<(std::ostream &out, M const &m) {
-  for (size_t i = 0; i < M::rows; ++i) {
-    for (size_t j = 0; j < M::columns; ++j) {
-      out << " " << m[i, j] << ",";
-    }
-    out << std::endl;
-  }
+  out << to_string(m);
   return out;
 }
 

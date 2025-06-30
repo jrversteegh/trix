@@ -15,6 +15,7 @@
 #include <fmt/ranges.h>
 
 #include "config.h"
+#include "types.h"
 
 namespace trix {
 
@@ -82,7 +83,6 @@ struct VectorArrayStorage : VectorStorageType<N, T>, FullVectorType<N> {
     return a_[check_and_get_offset_(i)];
   }
   constexpr size_t size() const { return elements; }
-  std::string str() const { return fmt::format(fmtstr, fmt::join(a_, ", ")); }
 
 private:
   std::array<T, elements> a_{};
@@ -162,6 +162,19 @@ struct Vector : Storage<N, T>, VectorType {
                 "Excepted Vector to satisfy VectorConcept");
 };
 
+template <VectorConcept V> constexpr auto begin(V const &v) {
+  return IndexIterator(v, 0);
+}
+
+template <VectorConcept V> constexpr auto end(V const &v) {
+  return IndexIterator(v, V::components);
+}
+
+template <VectorConcept V> constexpr auto to_string(V const &v) {
+  std::vector<typename V::value_type> values(begin(v), end(v));
+  return fmt::format(trix_fmtstr, fmt::join(values, ", "));
+}
+
 template <typename C, typename... Cs>
 auto vector(C &&first, Cs &&...components) {
   return Vector<sizeof...(Cs) + 1, C>{std::forward<C>(first),
@@ -229,7 +242,7 @@ constexpr auto cross(V1 const &v1, V2 const &v2) {
 
 template <VectorConcept V>
 std::ostream &operator<<(std::ostream &out, V const &v) {
-  out << v.str();
+  out << to_string(v);
   return out;
 }
 

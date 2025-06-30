@@ -104,9 +104,9 @@ struct SymmetricMatrixFixture {
 
 BOOST_FIXTURE_TEST_CASE(matrix_construction_helper_test, SymmetricMatrixFixture) {
   auto r = matrix(
-    1.0, 2.0, 3.0, 
+    1.0, 2.0, 3.0,
     2.0, 3.0, 4.0,
-    3.0, 4.0, 5.0 
+    3.0, 4.0, 5.0
   );
   BOOST_TEST(r == symmetric);
 };
@@ -172,6 +172,29 @@ BOOST_FIXTURE_TEST_CASE(matrix_symmetric_subtract, SymmetricMatrixFixture) {
   do_cross_test(test, square, symmetric, square_zero, symmetric_zero);
 };
 
+BOOST_FIXTURE_TEST_CASE(matrix_transpose, MatrixFixture) {
+  BOOST_TEST(m43.transpose() == m34);
+  BOOST_TEST((m43 * m43.transpose()) == (m43 * m34));
+  BOOST_TEST((m34 + m43.transpose()) == (2 * m34));
+}
+
+BOOST_FIXTURE_TEST_CASE(matrix_diagonal, MatrixFixture) {
+  BOOST_TEST(m43.diagonal() == vector(1., 3.,  5.));
+}
+
+BOOST_FIXTURE_TEST_CASE(matrix_row, MatrixFixture) {
+  BOOST_TEST(m43.row(0) == vector(1., 2., 3.));
+}
+
+BOOST_FIXTURE_TEST_CASE(matrix_column, MatrixFixture) {
+  BOOST_TEST(m43.column(0) == vector(1., 2., 3., 4.));
+}
+
+BOOST_FIXTURE_TEST_CASE(matrix_to_string, MatrixFixture) {
+  std::string expected = "1, 2, 3\n2, 3, 4\n3, 4, 5\n4, 5, 6";
+  BOOST_TEST(to_string(m43) == expected);
+}
+
 struct DiagonalMatrixFixture {
   IdentityMatrix<3> identity{};
   DiagonalMatrix<3> diagonal_identity{1.0, 1.0, 1.0};
@@ -227,13 +250,6 @@ BOOST_FIXTURE_TEST_CASE(diagonal_multiplication, DiagonalMatrixFixture) {
   static_assert(std::is_same_v<decltype(r1), decltype(diagonal_identity)>, "Expected result of diagonal multiplication to be diagonal");
   BOOST_TEST(r1 == diagonal_identity);
 };
-
-BOOST_FIXTURE_TEST_CASE(matrix_transpose, MatrixFixture) {
-  BOOST_TEST(m43.transpose() == m34);
-  BOOST_TEST((m43 * m43.transpose()) == (m43 * m34));
-  BOOST_TEST((m34 + m43.transpose()) == (2 * m34));
-}
-
 
 ut::test_suite* init_unit_test_suite(int, char*[]) {
 /*
