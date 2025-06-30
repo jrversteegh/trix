@@ -16,6 +16,7 @@ struct VectorFixture {
   };
   Number emv3{14.0};
   Number emv4{30.0};
+  Number en3{std::sqrt(emv3)};
   Vector<3> ea3{
     2.0, 4.0, 6.0
   };
@@ -65,13 +66,20 @@ BOOST_FIXTURE_TEST_CASE(vector3_negation_test, VectorFixture) {
 
 BOOST_FIXTURE_TEST_CASE(vector3_str_test, VectorFixture) {
   auto r = v3.str();
-  BOOST_TEST(r == "1.0000, 2.0000, 3.0000");
+  BOOST_TEST(r == "1, 2, 3");
 };
 
 BOOST_FIXTURE_TEST_CASE(vector3_element_test, VectorFixture) {
   BOOST_TEST(v3[0] == 1.);
   v3[0] = 2.;
   BOOST_TEST(v3[0] == 2.);
+};
+
+BOOST_FIXTURE_TEST_CASE(vector3_norm_test, VectorFixture) {
+  auto r1 = v3.length();
+  auto r2 = v3.norm();
+  BOOST_TEST(r1 == r2);
+  BOOST_TEST(r1 == en3);
 };
 
 ut::test_suite* init_unit_test_suite(int, char*[]) {
