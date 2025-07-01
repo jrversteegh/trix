@@ -1,12 +1,50 @@
 #include "test_common.h"
+
+#include <ranges>
+
 #include <boost/test/parameterized_test.hpp>
 
 #include "trix/matrix.h"
 
 namespace ut = boost::unit_test;
+namespace ranges = std::ranges;
 
 using namespace trix;
 
+BOOST_AUTO_TEST_CASE(matrix_construct_from_iter_test) {
+  auto source = std::vector{1., 2., 3., 4.};
+  auto m1 = Matrix<2, 2>(source.begin(), source.end());
+  BOOST_TEST(m1 == matrix(1., 2., 3., 4.));
+
+  double psource[] = {1., 2., 3., 4.};
+  auto m2 = Matrix<2, 2>(psource, psource + 4);
+  BOOST_TEST(m2 == matrix(1., 2., 3., 4.));
+}
+
+BOOST_AUTO_TEST_CASE(matrix_construct_from_array_test) {
+  auto m1 = Matrix<2, 2>(std::array{1., 2., 3., 4.});
+  BOOST_TEST(m1 == matrix(1., 2., 3., 4.));
+
+  auto source = std::array{1., 2., 3., 4.};
+  auto m2 = Matrix<2, 2>(source);
+  BOOST_TEST(m2 == matrix(1., 2., 3., 4.));
+}
+
+BOOST_AUTO_TEST_CASE(matrix_construct_from_range_test) {
+  auto const a = std::array{1., 2., 3., 4.};
+  auto m1 = Matrix<2, 2>(std::from_range, a);
+  BOOST_TEST(m1== matrix(1., 2., 3., 4.));
+
+  m1 = Matrix<2, 2>(std::from_range, a | ranges::views::take(3));
+  BOOST_TEST(m1== matrix(1., 2., 3., 0.));
+
+  auto const to_short = std::array{1., 2.};
+  auto m2 = Matrix<2, 2>(std::from_range, to_short);
+  BOOST_TEST(m2 == matrix(1., 2., 0., 0.));
+
+  auto m3 = Matrix<2, 2>(std::from_range, ranges::views::iota(1));
+  BOOST_TEST(m3 == matrix(1., 2., 3., 4.));
+}
 
 struct MatrixFixture {
   Matrix<3,4> m34{

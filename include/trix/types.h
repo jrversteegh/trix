@@ -7,16 +7,16 @@ namespace trix {
 
 template <typename T>
 struct IndexIterator {
-  using difference_type = std::ptrdiff_t;
+  using difference_type = typename T::value_type;
   using value_type = typename T::value_type;
-  using pointer = value_type*;
-  using reference = value_type&;
+  using pointer = value_type const*;
+  using reference = value_type;
   using iterator_category = std::input_iterator_tag;
 
   constexpr IndexIterator(T const& container, size_t pos)
       : container_(container), pos_(pos) {}
 
-  constexpr value_type operator*() const {
+  constexpr reference operator*() const {
     return container_[pos_];
   }
 

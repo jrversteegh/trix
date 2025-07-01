@@ -1,11 +1,52 @@
 #include "test_common.h"
+
+#include <array>
+#include <vector>
+#include <ranges>
+
 #include <boost/test/parameterized_test.hpp>
 
 #include "trix/vector.h"
 
 namespace ut = boost::unit_test;
+namespace ranges = std::ranges;
 
 using namespace trix;
+
+BOOST_AUTO_TEST_CASE(vector3_construct_from_iter_test) {
+  auto source = std::vector{1., 2., 3., 4.};
+  auto v1 = Vector<3>(source.begin(), source.end());
+  BOOST_TEST(v1 == vector(1., 2., 3.));
+
+  double psource[] = {1., 2., 3.};
+  auto v2 = Vector<3>(psource, psource + 3);
+  BOOST_TEST(v2 == vector(1., 2., 3.));
+}
+
+BOOST_AUTO_TEST_CASE(vector3_construct_from_array_test) {
+  auto v1 = Vector<3>(std::array{1., 2., 3.});
+  BOOST_TEST(v1 == vector(1., 2., 3.));
+
+  auto source = std::array{1., 2., 3.};
+  auto v2 = Vector<3>(source);
+  BOOST_TEST(v2 == vector(1., 2., 3.));
+}
+
+BOOST_AUTO_TEST_CASE(vector3_construct_from_range_test) {
+  auto const to_long = std::array{1., 2., 3., 4.};
+  auto v1 = Vector<3>(std::from_range, to_long | ranges::views::take(4));
+  BOOST_TEST(v1== vector(1., 2., 3.));
+  v1 = Vector<3>(std::from_range, to_long | ranges::views::take(3));
+  BOOST_TEST(v1== vector(1., 2., 3.));
+  v1 = Vector<3>(std::from_range, to_long | ranges::views::take(2));
+  BOOST_TEST(v1== vector(1., 2., 0.));
+
+  auto const to_short = std::array{1., 2.};
+  auto v2 = Vector<3>(std::from_range, to_short);
+  BOOST_TEST(v2 == vector(1., 2., 0.));
+  auto v3 = Vector<3>(std::from_range, ranges::views::iota(1));
+  BOOST_TEST(v3 == vector(1., 2., 3.));
+}
 
 struct VectorFixture {
   Vector<3> v3{

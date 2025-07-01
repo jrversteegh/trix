@@ -5,8 +5,10 @@
 #include <cassert>
 #include <cstddef>
 #include <functional>
+#include <iterator>
 #include <ostream>
 #include <random>
+#include <ranges>
 #include <sstream>
 #include <type_traits>
 #include <utility>
@@ -74,10 +76,25 @@ template <typename STORAGE, size_t N, size_t SIZE, typename T = Number>
 struct VectorArrayStorage : VectorStorageType<N, T>, FullVectorType<N> {
   static constexpr size_t elements = SIZE;
   template <std::convertible_to<T>... Values>
-  constexpr VectorArrayStorage(Values&&... values)
+  explicit constexpr VectorArrayStorage(Values&&... values)
       : a_{std::forward<Values>(values)...} {};
   explicit constexpr VectorArrayStorage(std::array<T, elements>&& array)
-      : a_{std::forward(array)} {};
+      : a_{std::move(array)} {};
+  explicit constexpr VectorArrayStorage(std::array<T, elements> const& array)
+      : a_{array} {};
+  template <std::input_iterator It, typename Ite>
+    requires std::convertible_to<typename std::iterator_traits<It>::value_type,
+                                 T>
+  constexpr VectorArrayStorage(It first, Ite last) {
+    for (size_t i = 0; i < SIZE; ++i) {
+      if (first == last)
+        break;
+      a_[i] = *first++;
+    }
+  }
+  template <std::ranges::input_range R>
+  constexpr VectorArrayStorage(std::from_range_t, R const& r)
+      : VectorArrayStorage(r.begin(), r.end()) {}
   constexpr T operator[](size_t const i) const {
     return a_[check_and_get_offset_(i)];
   }

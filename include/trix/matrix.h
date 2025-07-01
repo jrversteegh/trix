@@ -124,7 +124,22 @@ struct MatrixArrayStorage : MatrixStorageType<N, M, T> {
   constexpr MatrixArrayStorage(Values&&... values)
       : a_{std::forward<Values>(values)...} {};
   constexpr MatrixArrayStorage(std::array<T, elements>&& array)
-      : a_{std::forward(array)} {}
+      : a_{std::move(array)} {}
+  constexpr MatrixArrayStorage(std::array<T, elements> const& array)
+      : a_{array} {}
+  template <std::input_iterator It, typename Ite>
+    requires std::convertible_to<typename std::iterator_traits<It>::value_type,
+                                 T>
+  constexpr MatrixArrayStorage(It first, Ite last) {
+    for (size_t i = 0; i < SIZE; ++i) {
+      if (first == last)
+        break;
+      a_[i] = *first++;
+    }
+  }
+  template <std::ranges::input_range R>
+  constexpr MatrixArrayStorage(std::from_range_t, R const& r)
+      : MatrixArrayStorage(r.begin(), r.end()) {}
   constexpr T operator[](size_t const i, size_t const j) const {
     return a_[check_and_get_offset_(i, j)];
   }
@@ -297,6 +312,11 @@ struct Matrix : Storage<N, M, T>, MatrixType {
     return result;
   }
 
+  constexpr Transpose const& transpose() const {
+    static Transpose result{*this};
+    return result;
+  }
+
   struct Diagonal : View, VectorStorageType<std::min(N, M), T> {
     using View::View;
     constexpr T operator[](size_t const i) const {
@@ -307,6 +327,11 @@ struct Matrix : Storage<N, M, T>, MatrixType {
                 "Excepted Diagonal to satisfy VectorConcept");
 
   constexpr Diagonal& diagonal() {
+    static Diagonal result{*this};
+    return result;
+  }
+
+  constexpr Diagonal const& diagonal() const {
     static Diagonal result{*this};
     return result;
   }
