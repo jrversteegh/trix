@@ -50,6 +50,7 @@ static void benchmark_matrix_mul(benchmark::State& state) {
   auto m2 = get_random_matrix();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
+    // Number of loops tuned so it takes ~100ns on i9 13k9 compiled with GCC 15.1
     for (int i = 0; i < 29; ++i) {
       auto value = m1 * m2;
       benchmark::DoNotOptimize(value);
@@ -63,6 +64,7 @@ static void benchmark_matrix_equality(benchmark::State& state) {
   auto m2 = m1;
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
+    // Number of loops tuned so it takes ~100ns on i9 13k9 compiled with GCC 15.1
     for (int i = 0; i < 35; ++i) {
       auto value = m1 == m2;
       benchmark::DoNotOptimize(value);
@@ -76,6 +78,7 @@ static void benchmark_symmetric_equality(benchmark::State& state) {
   auto m2 = m1;
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
+    // Number of loops tuned so it takes ~100ns on i9 13k9 compiled with GCC 15.1
     for (int i = 0; i < 51; ++i) {
       auto value = m1 == m2;
       benchmark::DoNotOptimize(value);
@@ -89,7 +92,8 @@ static void benchmark_diagonal_equality(benchmark::State& state) {
   auto m2 = m1;
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    for (int i = 0; i < 102; ++i) {
+    // Number of loops tuned so it takes ~100ns on i9 13k9 compiled with GCC 15.1
+    for (int i = 0; i < 99; ++i) {
       auto value = m1 == m2;
       benchmark::DoNotOptimize(value);
     }
@@ -105,7 +109,8 @@ static void benchmark_vector_op_minus(benchmark::State& state) {
   auto v = get_random_vector();
   benchmark::DoNotOptimize(v);
   for (auto _ : state) {
-    for (int i = 0; i < 132; ++i) {
+    // Number of loops tuned so it takes ~100ns on i9 13k9 compiled with GCC 15.1
+    for (int i = 0; i < 130; ++i) {
       auto value = -v;
       benchmark::DoNotOptimize(value);
     }
@@ -118,7 +123,8 @@ static void benchmark_vector_equality(benchmark::State& state) {
   auto v2 = v1;
   benchmark::DoNotOptimize(v2);
   for (auto _ : state) {
-    for (int i = 0; i < 32; ++i) {
+    // Number of loops tuned so it takes ~100ns on i9 13k9 compiled with GCC 15.1
+    for (int i = 0; i < 30; ++i) {
       auto value = v1 == v2;
       benchmark::DoNotOptimize(value);
     }
