@@ -10,6 +10,7 @@
 #include <ranges>
 #include <sstream>
 #include <type_traits>
+#include <utility>
 
 #include "config.h"
 #include "vector.h"
@@ -20,8 +21,8 @@ template <typename M>
 concept MatrixConcept = requires(M const m, size_t i, size_t j) {
   typename M::value_type;
   { m.operator[](i, j) } -> std::same_as<typename M::value_type>;
-  { M::rows } -> std::convertible_to<size_t>;
-  { M::columns } -> std::convertible_to<size_t>;
+  { M::rows } -> std::convertible_to<size_t const>;
+  { M::columns } -> std::convertible_to<size_t const>;
 };
 
 template <typename M>
@@ -34,8 +35,8 @@ struct MatrixType {};
 
 template <size_t N, size_t M, typename T>
 struct MatrixStorageType {
-  static constexpr size_t rows = N;
-  static constexpr size_t columns = M;
+  static constexpr size_t const rows = N;
+  static constexpr size_t const columns = M;
   using value_type = T;
 };
 
@@ -226,8 +227,8 @@ private:
 template <size_t N, size_t M = N, typename T = Number>
   requires(M == N)
 struct IdentityStorage : DiagonalType<N>, MatrixStorageType<N, N, T> {
-  static constexpr size_t rows = N;
-  static constexpr size_t columns = N;
+  static constexpr size_t const rows = N;
+  static constexpr size_t const columns = N;
   constexpr T operator[](size_t const i, size_t const j) const {
     return i == j ? 1 : 0;
   }
@@ -239,24 +240,24 @@ template <size_t N, size_t M = N, typename T = Number,
   requires(N > 0 && M > 0)
 struct Matrix : Storage<N, M, T>, MatrixType {
   using Storage<N, M, T>::Storage;
-  template <MatrixConcept OTHER>
-  explicit constexpr Matrix(OTHER const& other)
-      : Storage<OTHER::rows, OTHER::columns, typename OTHER::value_type>{} {
+  template <MatrixConcept O>
+  explicit constexpr Matrix(O const& other)
+      : Storage<O::rows, O::columns, typename O::value_type>{} {
     this->for_each_element(
         [this, &other](size_t i, size_t j) { (*this)[i, j] = other[i, j]; });
   }
 
-  template <MatrixConcept OTHER>
-    requires(OTHER::rows == N && OTHER::columns == M)
-  constexpr Matrix& operator+=(OTHER const& other) {
+  template <MatrixConcept O>
+    requires(O::rows == N && O::columns == M)
+  constexpr Matrix& operator+=(O const& other) {
     this->for_each_element(
         [this, &other](size_t i, size_t j) { (*this)[i, j] += other[i, j]; });
     return *this;
   }
 
-  template <MatrixConcept OTHER>
-    requires(OTHER::rows == N && OTHER::columns == M)
-  constexpr Matrix& operator-=(OTHER const& other) {
+  template <MatrixConcept O>
+    requires(O::rows == N && O::columns == M)
+  constexpr Matrix& operator-=(O const& other) {
     this->for_each_element(
         [this, &other](size_t i, size_t j) { (*this)[i, j] -= other[i, j]; });
     return *this;
@@ -275,9 +276,9 @@ struct Matrix : Storage<N, M, T>, MatrixType {
         });
   }
 
-  template <MatrixConcept OTHER>
-    requires(OTHER::rows == N && OTHER::columns == M)
-  constexpr bool operator==(OTHER const& other) const {
+  template <MatrixConcept O>
+    requires(O::rows == N && O::columns == M)
+  constexpr bool operator==(O const& other) const {
     for (size_t i = 0; i < N; ++i) {
       for (size_t j = 0; j < M; ++j) {
         if ((*this)[i, j] != other[i, j])
@@ -287,11 +288,11 @@ struct Matrix : Storage<N, M, T>, MatrixType {
     return true;
   }
   static_assert(MatrixConcept<Matrix>,
-                "Excepted Matrix to satisfy MatrixConcept");
+                "Expected Matrix to satisfy MatrixConcept");
 
   struct View {
-    constexpr View(Matrix& m) : matrix(m) {};
-    Matrix& matrix;
+    explicit constexpr View(Matrix const& m) : matrix(m) {};
+    Matrix const& matrix;
   };
 
   struct Transpose : View, MatrixStorageType<M, N, T> {
@@ -299,18 +300,10 @@ struct Matrix : Storage<N, M, T>, MatrixType {
     constexpr T operator[](size_t const i, size_t const j) const {
       return this->matrix[j, i];
     }
-    constexpr T& operator[](size_t const i, size_t const j) {
-      return this->matrix[j, i];
-    }
   };
 
   static_assert(MatrixConcept<Transpose>,
-                "Excepted Transpose to satisfy MatrixConcept");
-
-  constexpr Transpose& transpose() {
-    static Transpose result{*this};
-    return result;
-  }
+                "Expected Transpose to satisfy MatrixConcept");
 
   constexpr Transpose const& transpose() const {
     static Transpose result{*this};
@@ -319,17 +312,14 @@ struct Matrix : Storage<N, M, T>, MatrixType {
 
   struct Diagonal : View, VectorStorageType<std::min(N, M), T> {
     using View::View;
+
     constexpr T operator[](size_t const i) const {
       return this->matrix[i, i];
     }
   };
-  static_assert(VectorConcept<Diagonal>,
-                "Excepted Diagonal to satisfy VectorConcept");
 
-  constexpr Diagonal& diagonal() {
-    static Diagonal result{*this};
-    return result;
-  }
+  static_assert(VectorConcept<Diagonal>,
+                "Expected Diagonal to satisfy VectorConcept");
 
   constexpr Diagonal const& diagonal() const {
     static Diagonal result{*this};
@@ -337,11 +327,10 @@ struct Matrix : Storage<N, M, T>, MatrixType {
   }
 
   template <size_t S>
-  struct RowColumnView {
-    constexpr RowColumnView(Matrix const& m, size_t i) : matrix(m), index(i) {
+  struct RowColumnView : View {
+    constexpr RowColumnView(Matrix const& m, size_t i) : View(m), index(i) {
       assert(i < S);
     };
-    Matrix const& matrix;
     size_t index;
   };
 
@@ -351,7 +340,7 @@ struct Matrix : Storage<N, M, T>, MatrixType {
       return this->matrix[this->index, i];
     }
   };
-  static_assert(VectorConcept<Row>, "Excepted Row to satisfy VectorConcept");
+  static_assert(VectorConcept<Row>, "Expected Row to satisfy VectorConcept");
 
   constexpr Row& row(size_t const i) const {
     static Row result{*this, i};
@@ -365,7 +354,7 @@ struct Matrix : Storage<N, M, T>, MatrixType {
     }
   };
   static_assert(VectorConcept<Column>,
-                "Excepted Column to satisfy VectorConcept");
+                "Expected Column to satisfy VectorConcept");
 
   constexpr Column& column(size_t const i) const {
     static Column result{*this, i};

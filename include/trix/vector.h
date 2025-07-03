@@ -25,7 +25,7 @@ template <typename V>
 concept VectorConcept = requires(V const v, size_t i) {
   typename V::value_type;
   { v.operator[](i) } -> std::same_as<typename V::value_type>;
-  { V::components } -> std::convertible_to<size_t>;
+  { V::components } -> std::convertible_to<size_t const>;
 };
 
 template <typename V>
@@ -37,7 +37,7 @@ struct VectorType {};
 
 template <size_t N, typename T>
 struct VectorStorageType {
-  static constexpr size_t components = N;
+  static constexpr size_t const components = N;
   using value_type = T;
 };
 
@@ -124,29 +124,58 @@ struct VectorGenericStorage
   }
 };
 
+template <VectorConcept V, size_t B, size_t E = V::components, size_t S = 1>
+struct Slice {
+  using value_type = V::value_type;
+  static constexpr size_t const start = B;
+  static constexpr size_t const stop = E;
+  static constexpr size_t const components = (E - B - 1) / S + 1;
+  static constexpr size_t const stride = S;
+
+  constexpr Slice(V& vector) : vector_(vector) {}
+
+  constexpr value_type operator[](size_t const index) const {
+    size_t const offset = start + index * stride;
+    assert(offset < stop);
+    return vector_[offset];
+  }
+
+  constexpr value_type& operator[](size_t const index) {
+    size_t const offset = start + index * stride;
+    assert(offset < stop);
+    return vector_[offset];
+  }
+
+  static_assert(VectorConcept<Slice>,
+                "Excepted Slice to satisfy VectorConcept");
+
+private:
+  V& vector_;
+};
+
 template <size_t N, typename T = Number,
           template <size_t, typename C> typename Storage = VectorGenericStorage>
   requires(N > 0)
 struct Vector : Storage<N, T>, VectorType {
   using Storage<N, T>::Storage;
-  template <VectorConcept OTHER>
-    requires(OTHER::components >= Vector::components)
-  explicit constexpr Vector(OTHER const& other)
-      : Storage<OTHER::components, typename OTHER::value_type>{} {
+  template <VectorConcept O>
+    requires(O::components >= Vector::components)
+  explicit constexpr Vector(O const& other)
+      : Storage<O::components, typename O::value_type>{} {
     this->for_each_element([this, &other](size_t i) { (*this)[i] = other[i]; });
   }
 
-  template <VectorConcept OTHER>
-    requires(OTHER::components == N)
-  constexpr Vector& operator+=(OTHER const& other) {
+  template <VectorConcept O>
+    requires(O::components == N)
+  constexpr Vector& operator+=(O const& other) {
     this->for_each_element(
         [this, &other](size_t i) { (*this)[i] += other[i]; });
     return *this;
   }
 
-  template <VectorConcept OTHER>
-    requires(OTHER::components == N)
-  constexpr Vector& operator-=(OTHER const& other) {
+  template <VectorConcept O>
+    requires(O::components == N)
+  constexpr Vector& operator-=(O const& other) {
     this->for_each_element(
         [this, &other](size_t i) { (*this)[i] -= other[i]; });
     return *this;
@@ -175,14 +204,10 @@ struct Vector : Storage<N, T>, VectorType {
         [this, &other](size_t i) -> bool { return (*this)[i] == other[i]; });
   }
 
-  template <VectorConcept OTHER>
-    requires(OTHER::components == N)
-  constexpr bool operator==(OTHER const& other) const {
-    for (size_t i = 0; i < N; ++i) {
-      if ((*this)[i] != other[i])
-        return false;
-    }
-    return true;
+  template <size_t B, size_t E = N, size_t S = 1>
+  constexpr auto slice(this auto&& self) {
+    return Slice<std::remove_reference_t<decltype(self)>, B, std::min(E, N), S>{
+        self};
   }
 
   static_assert(VectorConcept<Vector>,
@@ -209,6 +234,17 @@ template <typename C, typename... Cs>
 auto vector(C&& first, Cs&&... components) {
   return Vector<sizeof...(Cs) + 1, C>{std::forward<C>(first),
                                       std::forward<Cs>(components)...};
+}
+
+template <VectorConcept V1, VectorConcept V2, size_t... Is>
+constexpr bool equals(V1 const& v1, V2 const& v2, std::index_sequence<Is...>) {
+  return (... && (v1[Is] == v2[Is]));
+}
+
+template <VectorConcept V1, VectorConcept V2>
+  requires(V1::components == V2::components)
+constexpr bool operator==(V1 const& v1, V2 const& v2) {
+  return equals(v1, v2, std::make_index_sequence<V1::components>{});
 }
 
 template <VectorConcept V1, VectorConcept V2>

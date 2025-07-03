@@ -123,20 +123,18 @@ BOOST_FIXTURE_TEST_CASE(vector3_norm_test, VectorFixture) {
   BOOST_TEST(r1 == en3);
 };
 
-ut::test_suite* init_unit_test_suite(int, char*[]) {
-/*
-UnitQuaternion uqs[] = {
-    UnitQuaternion{std::sqrt(0.5f), 0.5f, 0.5f, 0.0f},
-    UnitQuaternion{0.5f, 0.0f, 0.5f, -1.f * std::sqrt(0.5f)}};
-
-void test_qmq_conversion(UnitQuaternion q) {
-  RotationMatrix m{q};
-  UnitQuaternion result = static_cast<UnitQuaternion>(m);
-  BOOST_TEST((result == q || result == -q));
+BOOST_AUTO_TEST_CASE(vector_slice_test) {
+  auto v = vector(1., 2., 3., 4.);
+  auto s = v.slice<1, 6, 2>();
+  BOOST_TEST(s == vector(2., 4.));
 }
 
-*/
-//  ut::framework::master_test_suite().add(BOOST_PARAM_TEST_CASE(
-//      &test_qmq_conversion, uqs, uqs + sizeof(uqs) / sizeof(uqs[0])));
+BOOST_AUTO_TEST_CASE(vector_const_slice_test) {
+  auto const v = vector(1., 2., 3., 4.);
+  auto s = v.slice<1, 6, 2>();
+  BOOST_TEST(s == vector(2., 4.));
+}
+
+ut::test_suite* init_unit_test_suite(int, char*[]) {
   return 0;
 }
