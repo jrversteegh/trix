@@ -9,6 +9,8 @@
 
 using namespace trix;
 
+using trix::operator==;
+
 auto r() {
   static std::random_device rd;
   static std::mt19937 gen(rd());
@@ -17,31 +19,93 @@ auto r() {
 }
 
 auto get_random_matrix() {
-  return Matrix<3, 3>{
+  return matrix(
     r(), r(), r(),
     r(), r(), r(),
+    r(), r(), r()
+  );
+}
+
+auto get_random_symmetric() {
+  return SymmetricMatrix<3>{
+    r(),
+    r(), r(),
     r(), r(), r(),
   };
 }
 
+auto get_random_diagonal() {
+  return DiagonalMatrix<3>{
+    r(), r(), r(),
+  };
+}
+
+auto get_random_vector() {
+  return vector(r(), r(), r(), r(), r(), r(), r(), r(), r(), r());
+}
+
 static void benchmark_matrix_mul(benchmark::State& state) {
   auto m1 = get_random_matrix();
-  auto m2 = get_random_matrix();
   benchmark::DoNotOptimize(m1);
+  auto m2 = get_random_matrix();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    auto value = m1 * m2;
-    benchmark::DoNotOptimize(value);
+    for (int i = 0; i < 29; ++i) {
+      auto value = m1 * m2;
+      benchmark::DoNotOptimize(value);
+    }
+  }
+}
+
+static void benchmark_matrix_equality(benchmark::State& state) {
+  auto m1 = get_random_matrix();
+  benchmark::DoNotOptimize(m1);
+  auto m2 = m1;
+  benchmark::DoNotOptimize(m2);
+  for (auto _ : state) {
+    for (int i = 0; i < 35; ++i) {
+      auto value = m1 == m2;
+      benchmark::DoNotOptimize(value);
+    }
+  }
+}
+
+static void benchmark_symmetric_equality(benchmark::State& state) {
+  auto m1 = get_random_symmetric();
+  benchmark::DoNotOptimize(m1);
+  auto m2 = m1;
+  benchmark::DoNotOptimize(m2);
+  for (auto _ : state) {
+    for (int i = 0; i < 51; ++i) {
+      auto value = m1 == m2;
+      benchmark::DoNotOptimize(value);
+    }
+  }
+}
+
+static void benchmark_diagonal_equality(benchmark::State& state) {
+  auto m1 = get_random_diagonal();
+  benchmark::DoNotOptimize(m1);
+  auto m2 = m1;
+  benchmark::DoNotOptimize(m2);
+  for (auto _ : state) {
+    for (int i = 0; i < 102; ++i) {
+      auto value = m1 == m2;
+      benchmark::DoNotOptimize(value);
+    }
   }
 }
 
 BENCHMARK(benchmark_matrix_mul);
+BENCHMARK(benchmark_matrix_equality);
+BENCHMARK(benchmark_symmetric_equality);
+BENCHMARK(benchmark_diagonal_equality);
 
 static void benchmark_vector_op_minus(benchmark::State& state) {
-  auto v = vector(1., 2., 3., 4., 5., 6., 7., 8., 9., 10.);
+  auto v = get_random_vector();
   benchmark::DoNotOptimize(v);
   for (auto _ : state) {
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 132; ++i) {
       auto value = -v;
       benchmark::DoNotOptimize(value);
     }
@@ -49,13 +113,13 @@ static void benchmark_vector_op_minus(benchmark::State& state) {
 }
 
 static void benchmark_vector_equality(benchmark::State& state) {
-  auto v = vector(1., 2., 3., 4., 5., 6., 7., 8., 9., 10.);
-  auto other = v;
-  benchmark::DoNotOptimize(v);
-  benchmark::DoNotOptimize(other);
+  auto v1 = get_random_vector();
+  benchmark::DoNotOptimize(v1);
+  auto v2 = v1;
+  benchmark::DoNotOptimize(v2);
   for (auto _ : state) {
-    for (int i = 0; i < 10; ++i) {
-      auto value = other == v;
+    for (int i = 0; i < 32; ++i) {
+      auto value = v1 == v2;
       benchmark::DoNotOptimize(value);
     }
   }

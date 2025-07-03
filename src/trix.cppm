@@ -9,6 +9,7 @@ export namespace trix {
   using trix::SymmetricMatrix;
   using trix::DiagonalMatrix;
   using trix::IdentityMatrix;
+  using trix::operator==;
   using trix::operator*;
   using trix::operator+;
   using trix::operator<<;

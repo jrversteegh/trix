@@ -13,6 +13,7 @@
 #include <utility>
 
 #include "config.h"
+#include "types.h"
 #include "vector.h"
 
 namespace trix {
@@ -45,18 +46,6 @@ struct RectangularBase {};
 template <size_t N, size_t M>
 struct RectangularType : RectangularBase {
   template <typename F>
-    requires std::same_as<std::invoke_result_t<F, size_t, size_t>, bool>
-  constexpr bool for_each_element_while_true(F fun) const {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
-        if (!fun(i, j))
-          return false;
-      }
-    }
-    return true;
-  }
-
-  template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t, size_t>, void>
   constexpr void for_each_element(F fun) {
     for (size_t i = 0; i < N; ++i) {
@@ -71,17 +60,6 @@ struct SymmetricBase : RectangularBase {};
 
 template <size_t N>
 struct SymmetricType : SymmetricBase {
-  template <typename F>
-    requires std::same_as<std::invoke_result_t<F, size_t, size_t>, bool>
-  constexpr bool for_each_element_while_true(F fun) const {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j <= i; ++j) {
-        if (!fun(i, j))
-          return false;
-      }
-    }
-    return true;
-  }
 
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t, size_t>, void>
@@ -98,16 +76,6 @@ struct DiagonalBase : SymmetricBase {};
 
 template <size_t N>
 struct DiagonalType : DiagonalBase {
-  template <typename F>
-    requires std::same_as<std::invoke_result_t<F, size_t, size_t>, bool>
-  constexpr bool for_each_element_while_true(F fun) const {
-    for (size_t i = 0; i < N; ++i) {
-      if (!fun(i, i))
-        return false;
-    }
-    return true;
-  }
-
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t, size_t>, void>
   constexpr void for_each_element(F fun) {
@@ -203,16 +171,6 @@ struct DiagonalStorage
   }
 
   template <typename F>
-    requires std::same_as<std::invoke_result_t<F, size_t, size_t>, bool>
-  constexpr bool for_each_element_while_true(F fun) const {
-    for (size_t i = 0; i < N; ++i) {
-      if (!fun(i, i))
-        return false;
-    }
-    return true;
-  }
-
-  template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t, size_t>, void>
   constexpr void for_each_element(F fun) {
     for (size_t i = 0; i < N; ++i) {
@@ -231,6 +189,71 @@ struct IdentityStorage : DiagonalType<N>, MatrixStorageType<N, N, T> {
   static constexpr size_t const columns = N;
   constexpr T operator[](size_t const i, size_t const j) const {
     return i == j ? 1 : 0;
+  }
+};
+
+template <MatrixConcept M>
+struct MatrixView {
+  explicit constexpr MatrixView(M& m) : matrix(m) {};
+  M& matrix;
+};
+
+template <MatrixConcept M>
+struct Transpose
+    : MatrixView<M>,
+      MatrixStorageType<M::columns, M::rows, typename M::value_type> {
+  using MatrixView<M>::MatrixView;
+  constexpr auto& operator[](size_t const i, size_t const j) {
+    return this->matrix[j, i];
+  }
+  constexpr auto operator[](size_t const i, size_t const j) const {
+    return this->matrix[j, i];
+  }
+};
+
+template <MatrixConcept M>
+struct Diagonal
+    : MatrixView<M>,
+      VectorStorageType<std::min(M::rows, M::columns), typename M::value_type> {
+  using MatrixView<M>::MatrixView;
+
+  constexpr auto& operator[](size_t const i) {
+    return this->matrix[i, i];
+  }
+  constexpr auto operator[](size_t const i) const {
+    return this->matrix[i, i];
+  }
+};
+
+template <MatrixConcept M, size_t S>
+struct RowColumnView : MatrixView<M> {
+  constexpr RowColumnView(M& m, size_t const i) : MatrixView<M>{m}, index{i} {
+    assert(i < S);
+  };
+  size_t const index;
+};
+
+template <MatrixConcept M, size_t S>
+struct Row : RowColumnView<M, S>,
+             VectorStorageType<M::columns, typename M::value_type> {
+  using RowColumnView<M, S>::RowColumnView;
+  constexpr auto& operator[](size_t const i) {
+    return this->matrix[this->index, i];
+  }
+  constexpr auto operator[](size_t const i) const {
+    return this->matrix[this->index, i];
+  }
+};
+
+template <MatrixConcept M, size_t S>
+struct Column : RowColumnView<M, S>,
+                VectorStorageType<M::rows, typename M::value_type> {
+  using RowColumnView<M, S>::RowColumnView;
+  constexpr auto& operator[](size_t const i) {
+    return this->matrix[i, this->index];
+  }
+  constexpr auto operator[](size_t const i) const {
+    return this->matrix[i, this->index];
   }
 };
 
@@ -269,97 +292,31 @@ struct Matrix : Storage<N, M, T>, MatrixType {
     return *this;
   }
 
-  constexpr bool operator==(Matrix const& other) const {
-    return this->for_each_element_while_true(
-        [this, &other](size_t i, size_t j) -> bool {
-          return (*this)[i, j] == other[i, j];
-        });
+  constexpr auto& transpose(this auto&& self) {
+    static auto result = Transpose{self};
+    return result;
   }
 
-  template <MatrixConcept O>
-    requires(O::rows == N && O::columns == M)
-  constexpr bool operator==(O const& other) const {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j < M; ++j) {
-        if ((*this)[i, j] != other[i, j])
-          return false;
-      }
-    }
-    return true;
+  constexpr auto& diagonal(this auto&& self) {
+    static auto result = Diagonal{self};
+    return result;
   }
+
+  template <typename Self>
+  constexpr auto& row(this Self&& self, size_t const i) {
+    static auto result = Row<std::remove_reference_t<Self>, self.rows>{self, i};
+    return result;
+  }
+
+  template <typename Self>
+  constexpr auto& column(this Self&& self, size_t const i) {
+    static auto result =
+        Column<std::remove_reference_t<Self>, self.columns>{self, i};
+    return result;
+  }
+
   static_assert(MatrixConcept<Matrix>,
                 "Expected Matrix to satisfy MatrixConcept");
-
-  struct View {
-    explicit constexpr View(Matrix const& m) : matrix(m) {};
-    Matrix const& matrix;
-  };
-
-  struct Transpose : View, MatrixStorageType<M, N, T> {
-    using View::View;
-    constexpr T operator[](size_t const i, size_t const j) const {
-      return this->matrix[j, i];
-    }
-  };
-
-  static_assert(MatrixConcept<Transpose>,
-                "Expected Transpose to satisfy MatrixConcept");
-
-  constexpr Transpose const& transpose() const {
-    static Transpose result{*this};
-    return result;
-  }
-
-  struct Diagonal : View, VectorStorageType<std::min(N, M), T> {
-    using View::View;
-
-    constexpr T operator[](size_t const i) const {
-      return this->matrix[i, i];
-    }
-  };
-
-  static_assert(VectorConcept<Diagonal>,
-                "Expected Diagonal to satisfy VectorConcept");
-
-  constexpr Diagonal const& diagonal() const {
-    static Diagonal result{*this};
-    return result;
-  }
-
-  template <size_t S>
-  struct RowColumnView : View {
-    constexpr RowColumnView(Matrix const& m, size_t i) : View(m), index(i) {
-      assert(i < S);
-    };
-    size_t index;
-  };
-
-  struct Row : RowColumnView<N>, VectorStorageType<M, T> {
-    using RowColumnView<N>::RowColumnView;
-    constexpr T operator[](size_t const i) const {
-      return this->matrix[this->index, i];
-    }
-  };
-  static_assert(VectorConcept<Row>, "Expected Row to satisfy VectorConcept");
-
-  constexpr Row& row(size_t const i) const {
-    static Row result{*this, i};
-    return result;
-  }
-
-  struct Column : RowColumnView<M>, VectorStorageType<N, T> {
-    using RowColumnView<M>::RowColumnView;
-    constexpr T operator[](size_t const i) const {
-      return this->matrix[i, this->index];
-    }
-  };
-  static_assert(VectorConcept<Column>,
-                "Expected Column to satisfy VectorConcept");
-
-  constexpr Column& column(size_t const i) const {
-    static Column result{*this, i};
-    return result;
-  }
 };
 
 template <MatrixConcept M>
@@ -389,6 +346,24 @@ auto matrix(C&& first, Cs&&... components) {
   constexpr size_t S = static_cast<size_t>(sqrt(sizeof...(Cs) + 1));
   return Matrix<S, S, C>{std::forward<C>(first),
                          std::forward<Cs>(components)...};
+}
+
+template <MatrixConcept M1, MatrixConcept M2, size_t... Is>
+constexpr bool row_equals(M1 const& m1, M2 const& m2, size_t i,
+                          std::index_sequence<Is...>) {
+  return (... && (m1[i, Is] == m2[i, Is]));
+}
+
+template <MatrixConcept M1, MatrixConcept M2, size_t... Is>
+constexpr bool equals(M1 const& m1, M2 const& m2, std::index_sequence<Is...>) {
+  return (... &&
+          (row_equals(m1, m2, Is, std::make_index_sequence<M1::columns>{})));
+}
+
+template <MatrixConcept M1, MatrixConcept M2>
+  requires(M1::rows == M2::rows && M1::columns == M2::columns)
+constexpr bool operator==(M1 const& m1, M2 const& m2) {
+  return equals(m1, m2, std::make_index_sequence<M1::rows>{});
 }
 
 template <MatrixConcept M1, MatrixConcept M2>

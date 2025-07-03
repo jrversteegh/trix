@@ -5,6 +5,9 @@
 
 namespace trix {
 
+template <typename T, typename... Ts>
+concept OneOf = (std::same_as<T, Ts> || ...);
+
 template <typename T>
 struct IndexIterator {
   using difference_type = typename T::value_type;

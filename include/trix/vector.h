@@ -44,16 +44,6 @@ struct VectorStorageType {
 template <size_t N>
 struct FullVectorType {
   template <typename F>
-    requires std::same_as<std::invoke_result_t<F, size_t>, bool>
-  constexpr bool for_each_element_while_true(F fun) const {
-    for (size_t i = 0; i < N; ++i) {
-      if (!fun(i))
-        return false;
-    }
-    return true;
-  }
-
-  template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t>, void>
   constexpr void for_each_element(F fun) {
     for (size_t i = 0; i < N; ++i) {
@@ -197,11 +187,6 @@ struct Vector : Storage<N, T>, VectorType {
 
   constexpr auto length() const {
     return norm();
-  }
-
-  constexpr bool operator==(Vector const& other) const {
-    return this->for_each_element_while_true(
-        [this, &other](size_t i) -> bool { return (*this)[i] == other[i]; });
   }
 
   template <size_t B, size_t E = N, size_t S = 1>

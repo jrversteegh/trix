@@ -127,6 +127,9 @@ BOOST_AUTO_TEST_CASE(vector_slice_test) {
   auto v = vector(1., 2., 3., 4.);
   auto s = v.slice<1, 6, 2>();
   BOOST_TEST(s == vector(2., 4.));
+  s[1] = 5.;
+  BOOST_TEST(s == vector(2., 5.));
+  BOOST_TEST(v == vector(1., 2., 3., 5.));
 }
 
 BOOST_AUTO_TEST_CASE(vector_const_slice_test) {
