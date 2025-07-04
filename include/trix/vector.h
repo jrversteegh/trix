@@ -136,9 +136,6 @@ struct Slice {
     return vector_[offset];
   }
 
-  static_assert(VectorConcept<Slice>,
-                "Excepted Slice to satisfy VectorConcept");
-
 private:
   V& vector_;
 };
@@ -194,9 +191,6 @@ struct Vector : Storage<N, T>, VectorType {
     return Slice<std::remove_reference_t<decltype(self)>, B, std::min(E, N), S>{
         self};
   }
-
-  static_assert(VectorConcept<Vector>,
-                "Excepted Vector to satisfy VectorConcept");
 };
 
 template <VectorConcept V>

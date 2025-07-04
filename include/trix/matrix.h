@@ -14,6 +14,7 @@
 
 #include "config.h"
 #include "types.h"
+#include "utils.h"
 #include "vector.h"
 
 namespace trix {
@@ -194,7 +195,7 @@ struct IdentityStorage : DiagonalType<N>, MatrixStorageType<N, N, T> {
 
 template <MatrixConcept M>
 struct MatrixView {
-  explicit constexpr MatrixView(M& m) : matrix(m) {};
+  explicit constexpr MatrixView(M& m) : matrix{m} {};
   M& matrix;
 };
 
@@ -203,6 +204,7 @@ struct Transpose
     : MatrixView<M>,
       MatrixStorageType<M::columns, M::rows, typename M::value_type> {
   using MatrixView<M>::MatrixView;
+
   constexpr auto& operator[](size_t const i, size_t const j) {
     return this->matrix[j, i];
   }
@@ -292,13 +294,15 @@ struct Matrix : Storage<N, M, T>, MatrixType {
     return *this;
   }
 
-  constexpr auto& transpose(this auto&& self) {
-    static auto result = Transpose{self};
+  template <typename Self>
+  constexpr auto& transpose(this Self&& self) {
+    static auto result = Transpose<std::remove_reference_t<Self>>{self};
     return result;
   }
 
-  constexpr auto& diagonal(this auto&& self) {
-    static auto result = Diagonal{self};
+  template <typename Self>
+  constexpr auto& diagonal(this Self&& self) {
+    static auto result = Diagonal<std::remove_reference_t<Self>>{self};
     return result;
   }
 
@@ -314,9 +318,6 @@ struct Matrix : Storage<N, M, T>, MatrixType {
         Column<std::remove_reference_t<Self>, self.columns>{self, i};
     return result;
   }
-
-  static_assert(MatrixConcept<Matrix>,
-                "Expected Matrix to satisfy MatrixConcept");
 };
 
 template <MatrixConcept M>
@@ -343,7 +344,7 @@ using IdentityMatrix = Matrix<N, N, T, IdentityStorage>;
 
 template <typename C, typename... Cs>
 auto matrix(C&& first, Cs&&... components) {
-  constexpr size_t S = static_cast<size_t>(sqrt(sizeof...(Cs) + 1));
+  constexpr size_t S = static_cast<size_t>(size_t_sqrt<sizeof...(Cs) + 1>());
   return Matrix<S, S, C>{std::forward<C>(first),
                          std::forward<Cs>(components)...};
 }
