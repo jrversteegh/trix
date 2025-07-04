@@ -289,30 +289,14 @@ BOOST_FIXTURE_TEST_CASE(diagonal_multiplication, DiagonalMatrixFixture) {
   BOOST_TEST(r1 == diagonal_identity);
 };
 
+BOOST_AUTO_TEST_CASE(matrix_conversion_test) {
+  auto const m = matrix(1, 2, 3, 4);
+  static_assert(std::is_same_v<decltype(m[0, 0]), int>, "Expected matrix element of m to be int");
+  auto const r = m * 0.5f;
+  static_assert(std::is_same_v<decltype(r[0, 0]), int>, "Expected matrix element of r to be float");
+  BOOST_TEST((r[1, 1]) == 2.0);
+};
+
 ut::test_suite* init_unit_test_suite(int, char*[]) {
-/*
-UnitQuaternion uqs[] = {
-    UnitQuaternion{std::sqrt(0.5f), 0.5f, 0.5f, 0.0f},
-    UnitQuaternion{0.0f, std::sqrt(0.5f), 0.5f, 0.5f},
-    UnitQuaternion{0.0f, 0.5f, std::sqrt(0.5f), 0.5f},
-    UnitQuaternion{0.5f, 0.0f, 0.5f, std::sqrt(0.5f)},
-    UnitQuaternion{std::sqrt(0.5f), -0.5f, 0.5f, 0.0f},
-    UnitQuaternion{0.0f, std::sqrt(0.5f), -0.5f, 0.5f},
-    UnitQuaternion{0.0f, 0.5f, std::sqrt(0.5f), -0.5f},
-    UnitQuaternion{-0.5f, 0.0f, 0.5f, std::sqrt(0.5f)},
-    UnitQuaternion{-1.f * std::sqrt(0.5f), 0.5f, 0.5f, 0.0f},
-    UnitQuaternion{0.0f, -1.f * std::sqrt(0.5f), 0.5f, 0.5f},
-    UnitQuaternion{0.0f, 0.5f, -1.f * std::sqrt(0.5f), 0.5f},
-    UnitQuaternion{0.5f, 0.0f, 0.5f, -1.f * std::sqrt(0.5f)}};
-
-void test_qmq_conversion(UnitQuaternion q) {
-  RotationMatrix m{q};
-  UnitQuaternion result = static_cast<UnitQuaternion>(m);
-  BOOST_TEST((result == q || result == -q));
-}
-
-*/
-//  ut::framework::master_test_suite().add(BOOST_PARAM_TEST_CASE(
-//      &test_qmq_conversion, uqs, uqs + sizeof(uqs) / sizeof(uqs[0])));
   return 0;
 }
