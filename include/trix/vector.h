@@ -24,6 +24,7 @@ concept VectorConcept = requires(V const v, size_t i) {
   typename V::value_type;
   { v.operator[](i) } -> std::same_as<typename V::value_type>;
   { V::components } -> std::convertible_to<size_t const>;
+  { V::elements } -> std::convertible_to<size_t const>;
 };
 
 template <typename V>
@@ -36,6 +37,7 @@ struct VectorType {};
 template <size_t N, typename T>
 struct VectorStorageType {
   static constexpr size_t const components = N;
+  static constexpr size_t elements = 0;
   using value_type = T;
 };
 
@@ -113,22 +115,20 @@ struct VectorGenericStorage
 };
 
 template <VectorConcept V, size_t B, size_t E = V::components, size_t S = 1>
-struct Slice {
-  using value_type = V::value_type;
+struct Slice : VectorStorageType<(E - B - 1) / S + 1, typename V::value_type> {
   static constexpr size_t const start = B;
   static constexpr size_t const stop = E;
-  static constexpr size_t const components = (E - B - 1) / S + 1;
   static constexpr size_t const stride = S;
 
   constexpr Slice(V& vector) : vector_(vector) {}
 
-  constexpr value_type operator[](size_t const index) const {
+  constexpr auto operator[](size_t const index) const {
     size_t const offset = start + index * stride;
     assert(offset < stop);
     return vector_[offset];
   }
 
-  constexpr value_type& operator[](size_t const index) {
+  constexpr auto& operator[](size_t const index) {
     size_t const offset = start + index * stride;
     assert(offset < stop);
     return vector_[offset];
@@ -209,7 +209,7 @@ auto vector(C&& first, Cs&&... components) {
 
 template <VectorConcept V1, VectorConcept V2, size_t... Is>
 constexpr bool equals(V1 const& v1, V2 const& v2, std::index_sequence<Is...>) {
-  return (... && (v1[Is] == v2[Is]));
+  return ((v1[Is] == v2[Is]) && ...);
 }
 
 template <VectorConcept V1, VectorConcept V2>

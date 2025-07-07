@@ -35,8 +35,11 @@ constexpr std::string to_string(M const& m) {
   return fmt::format("{}", fmt::join(lines, "\n"));
 }
 
+template <typename T>
+concept HasToString = requires(T v) { to_string(v); };
+
 template <typename C>
-  requires VectorConcept<C> || MatrixConcept<C>
+  requires HasToString<C>
 std::ostream& operator<<(std::ostream& out, C const& c) {
   out << to_string(c);
   return out;
