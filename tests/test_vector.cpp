@@ -7,6 +7,7 @@
 #include <boost/test/parameterized_test.hpp>
 
 #include "trix/vector.h"
+#include "trix/printing.h"
 
 namespace ut = boost::unit_test;
 namespace ranges = std::ranges;

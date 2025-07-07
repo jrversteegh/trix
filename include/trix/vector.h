@@ -6,10 +6,8 @@
 #include <cstddef>
 #include <functional>
 #include <iterator>
-#include <ostream>
 #include <random>
 #include <ranges>
-#include <sstream>
 #include <type_traits>
 #include <utility>
 
@@ -203,12 +201,6 @@ constexpr auto end(V const& v) {
   return IndexIterator(v, V::components);
 }
 
-template <VectorConcept V>
-constexpr auto to_string(V const& v) {
-  std::vector<typename V::value_type> values(begin(v), end(v));
-  return fmt::format(trix_fmtstr, fmt::join(values, ", "));
-}
-
 template <typename C, typename... Cs>
 auto vector(C&& first, Cs&&... components) {
   return Vector<sizeof...(Cs) + 1, C>{std::forward<C>(first),
@@ -283,12 +275,6 @@ template <VectorConcept V1, VectorConcept V2>
 constexpr auto cross(V1 const& v1, V2 const& v2) {
   return vector(v1[1] * v2[2] - v1[2] * v2[1], v1[2] * v2[0] - v1[0] * v2[2],
                 v1[0] * v2[1] - v1[1] * v2[0]);
-}
-
-template <VectorConcept V>
-std::ostream& operator<<(std::ostream& out, V const& v) {
-  out << to_string(v);
-  return out;
 }
 
 } // namespace trix

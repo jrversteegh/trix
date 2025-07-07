@@ -5,10 +5,8 @@
 #include <cassert>
 #include <cstddef>
 #include <functional>
-#include <ostream>
 #include <random>
 #include <ranges>
-#include <sstream>
 #include <type_traits>
 #include <utility>
 
@@ -320,19 +318,6 @@ struct Matrix : Storage<N, M, T>, MatrixType {
   }
 };
 
-template <MatrixConcept M>
-constexpr auto to_string(M const& m) {
-  std::array<std::string, M::rows> lines{};
-  for (size_t i = 0; i < M::rows; ++i) {
-    std::vector<typename M::value_type> values{};
-    for (size_t j = 0; j < M::columns; ++j) {
-      values.push_back(m[i, j]);
-    }
-    lines[i] = fmt::format(trix_fmtstr, fmt::join(values, ", "));
-  }
-  return fmt::format("{}", fmt::join(lines, "\n"));
-}
-
 template <size_t N, typename T = Number>
 using SymmetricMatrix = Matrix<N, N, T, SymmetricStorage>;
 
@@ -526,12 +511,6 @@ constexpr auto operator*(V const& v, M const& m) {
     }
   }
   return result;
-}
-
-template <MatrixConcept M>
-std::ostream& operator<<(std::ostream& out, M const& m) {
-  out << to_string(m);
-  return out;
 }
 
 } // namespace trix
