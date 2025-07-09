@@ -34,10 +34,10 @@ BOOST_AUTO_TEST_CASE(matrix_construct_from_array_test) {
 BOOST_AUTO_TEST_CASE(matrix_construct_from_range_test) {
   auto const a = std::array{1., 2., 3., 4.};
   auto m1 = Matrix<2, 2>(std::from_range, a);
-  BOOST_TEST(m1== matrix(1., 2., 3., 4.));
+  BOOST_TEST(m1 == matrix(1., 2., 3., 4.));
 
   m1 = Matrix<2, 2>(std::from_range, a | ranges::views::take(3));
-  BOOST_TEST(m1== matrix(1., 2., 3., 0.));
+  BOOST_TEST(m1 == matrix(1., 2., 3., 0.));
 
   auto const to_short = std::array{1., 2.};
   auto m2 = Matrix<2, 2>(std::from_range, to_short);
@@ -48,32 +48,22 @@ BOOST_AUTO_TEST_CASE(matrix_construct_from_range_test) {
 }
 
 struct MatrixFixture {
-  Matrix<3,4> m34{
-    1.0, 2.0, 3.0, 4.0,
-    2.0, 3.0, 4.0, 5.0,
-    3.0, 4.0, 5.0, 6.0,
+  Matrix<3, 4> m34{
+      1.0, 2.0, 3.0, 4.0, 2.0, 3.0, 4.0, 5.0, 3.0, 4.0, 5.0, 6.0,
   };
-  Matrix<4,3> m43{
-    1.0, 2.0, 3.0,
-    2.0, 3.0, 4.0,
-    3.0, 4.0, 5.0,
-    4.0, 5.0, 6.0,
+  Matrix<4, 3> m43{
+      1.0, 2.0, 3.0, 2.0, 3.0, 4.0, 3.0, 4.0, 5.0, 4.0, 5.0, 6.0,
   };
-  Matrix<3,3> e33{
-    30.0, 40.0, 50.0,
-    40.0, 54.0, 68.0,
-    50.0, 68.0, 86.0,
+  Matrix<3, 3> e33{
+      30.0, 40.0, 50.0, 40.0, 54.0, 68.0, 50.0, 68.0, 86.0,
   };
-  Matrix<4,4> e44{
-    14.0, 20.0, 26.0, 32.0,
-    20.0, 29.0, 38.0, 47.0,
-    26.0, 38.0, 50.0, 62.0,
-    32.0, 47.0, 62.0, 77.0,
+  Matrix<4, 4> e44{
+      14.0, 20.0, 26.0, 32.0, 20.0, 29.0, 38.0, 47.0,
+      26.0, 38.0, 50.0, 62.0, 32.0, 47.0, 62.0, 77.0,
   };
   Vector<3> v3{1., 2., 3.};
   Vector<4> v4{1., 2., 3., 4.};
 };
-
 
 BOOST_FIXTURE_TEST_CASE(matrix_mul_test3, MatrixFixture) {
   auto r = m34 * m43;
@@ -109,27 +99,19 @@ BOOST_FIXTURE_TEST_CASE(matrix_scalar_mul_test, MatrixFixture) {
   BOOST_TEST(r2 == e);
 };
 
-
-
 struct SymmetricMatrixFixture {
 
-  SymmetricMatrix<3> symmetric {
-    1.0,
-    2.0, 3.0,
-    3.0, 4.0, 5.0,
+  SymmetricMatrix<3> symmetric{
+      1.0, 2.0, 3.0, 3.0, 4.0, 5.0,
   };
 
   Matrix<3, 3> square{symmetric};
   Matrix<3, 3> square_asymmetric{
-    1.0, 2.0, 4.0,
-    2.0, 3.0, 4.0,
-    3.0, 4.0, 5.0,
+      1.0, 2.0, 4.0, 2.0, 3.0, 4.0, 3.0, 4.0, 5.0,
   };
 
   SymmetricMatrix<3> symmetric_multiplied{
-    14.,
-    20., 29.,
-    26., 38., 50.,
+      14., 20., 29., 26., 38., 50.,
   };
 
   Matrix<3, 3> square_multiplied{symmetric_multiplied};
@@ -141,12 +123,9 @@ struct SymmetricMatrixFixture {
   Matrix<3, 3> square_zero{};
 };
 
-BOOST_FIXTURE_TEST_CASE(matrix_construction_helper_test, SymmetricMatrixFixture) {
-  auto r = matrix(
-    1.0, 2.0, 3.0,
-    2.0, 3.0, 4.0,
-    3.0, 4.0, 5.0
-  );
+BOOST_FIXTURE_TEST_CASE(matrix_construction_helper_test,
+                        SymmetricMatrixFixture) {
+  auto r = matrix(1.0, 2.0, 3.0, 2.0, 3.0, 4.0, 3.0, 4.0, 5.0);
   BOOST_TEST(r == symmetric);
 };
 
@@ -171,10 +150,11 @@ struct Multiply {
   }
 };
 
-template <template<typename, typename> typename OPERATION>
+template <template <typename, typename> typename OPERATION>
 struct OperationTest {
   template <typename ARG1, typename ARG2, typename EXPECTED>
-  void operator()(ARG1 const& arg1, ARG2 const& arg2, EXPECTED const& expected) {
+  void operator()(ARG1 const& arg1, ARG2 const& arg2,
+                  EXPECTED const& expected) {
     OPERATION<ARG1, ARG2> operation{};
     auto r = operation(arg1, arg2);
     BOOST_TEST((typeid(r) == typeid(expected)));
@@ -182,7 +162,8 @@ struct OperationTest {
   }
 };
 
-void do_cross_test(auto& test, auto arg1, auto arg2, auto expected1, auto expected2) {
+void do_cross_test(auto& test, auto arg1, auto arg2, auto expected1,
+                   auto expected2) {
   test(arg1, arg1, expected1);
   test(arg1, arg2, expected1);
   test(arg2, arg1, expected1);
@@ -198,7 +179,8 @@ BOOST_FIXTURE_TEST_CASE(matrix_symmetric_equality, SymmetricMatrixFixture) {
 
 BOOST_FIXTURE_TEST_CASE(matrix_symmetric_multiply, SymmetricMatrixFixture) {
   OperationTest<Multiply> test{};
-  do_cross_test(test, square, symmetric, square_multiplied, symmetric_multiplied);
+  do_cross_test(test, square, symmetric, square_multiplied,
+                symmetric_multiplied);
 };
 
 BOOST_FIXTURE_TEST_CASE(matrix_symmetric_add, SymmetricMatrixFixture) {
@@ -218,7 +200,7 @@ BOOST_FIXTURE_TEST_CASE(matrix_transpose, MatrixFixture) {
 }
 
 BOOST_FIXTURE_TEST_CASE(matrix_diagonal, MatrixFixture) {
-  BOOST_TEST(m43.diagonal() == vector(1., 3.,  5.));
+  BOOST_TEST(m43.diagonal() == vector(1., 3., 5.));
 }
 
 BOOST_FIXTURE_TEST_CASE(matrix_row, MatrixFixture) {
@@ -239,21 +221,15 @@ struct DiagonalMatrixFixture {
   DiagonalMatrix<3> diagonal_identity{1.0, 1.0, 1.0};
   DiagonalMatrix<3> triple_identity{3.0, 3.0, 3.0};
   Matrix<3, 3> square_identity{
-    1.0, 0.0, 0.0,
-    0.0, 1.0, 0.0,
-    0.0, 0.0, 1.0,
+      1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
   };
 
   DiagonalMatrix<3> diagonal{1.0, 2.0, 3.0};
   Matrix<3> symmetric{
-    1.0,
-    2.0, 2.0,
-    3.0, 4.0, 3.0,
+      1.0, 2.0, 2.0, 3.0, 4.0, 3.0,
   };
   Matrix<3, 3> square_asymmetric{
-    1.0, 2.0, 4.0,
-    2.0, 2.0, 4.0,
-    3.0, 4.0, 3.0,
+      1.0, 2.0, 4.0, 2.0, 2.0, 4.0, 3.0, 4.0, 3.0,
   };
 };
 
@@ -286,17 +262,34 @@ BOOST_FIXTURE_TEST_CASE(diagonal_addition, DiagonalMatrixFixture) {
 
 BOOST_FIXTURE_TEST_CASE(diagonal_multiplication, DiagonalMatrixFixture) {
   auto r1 = diagonal_identity * diagonal_identity;
-  static_assert(std::is_same_v<decltype(r1), decltype(diagonal_identity)>, "Expected result of diagonal multiplication to be diagonal");
+  static_assert(std::is_same_v<decltype(r1), decltype(diagonal_identity)>,
+                "Expected result of diagonal multiplication to be diagonal");
   BOOST_TEST(r1 == diagonal_identity);
 };
 
 BOOST_AUTO_TEST_CASE(matrix_conversion_test) {
   auto const m = matrix(1, 2, 3, 4);
-  static_assert(std::is_same_v<decltype(m[0, 0]), int>, "Expected matrix element of m to be int");
+  static_assert(std::is_same_v<decltype(m[0, 0]), int>,
+                "Expected matrix element of m to be int");
   auto const r = m * 0.5f;
-  static_assert(std::is_same_v<decltype(r[0, 0]), int>, "Expected matrix element of r to be float");
+  static_assert(std::is_same_v<decltype(r[0, 0]), int>,
+                "Expected matrix element of r to be float");
   BOOST_TEST((r[1, 1]) == 2.0);
 };
+
+BOOST_AUTO_TEST_CASE(matrix_strassen_test) {
+  auto const strassen = Strassen<1>{};
+  auto const m1 = matrix(1, 2, 3, 4);
+  auto r1 = strassen(m1, m1);
+  auto e1 = m1 * m1;
+  BOOST_TEST(r1 == e1);
+
+  auto const m2 = matrix(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                         17, 18, 19, 20, 21, 22, 23, 24, 25);
+  auto r2 = strassen(m2, m2);
+  auto e2 = m2 * m2;
+  BOOST_TEST(r2 == e2);
+}
 
 ut::test_suite* init_unit_test_suite(int, char*[]) {
   return 0;

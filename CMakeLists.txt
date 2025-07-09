@@ -2,17 +2,25 @@ cmake_minimum_required(VERSION 3.28)
 
 project(trix)
 
+if(NOT DEFINED ${CMAKE_BUILD_TYPE})
+  set (CMAKE_BUILD_TYPE Release)
+endif()
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -fmax-errors=1")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_CXX_SCAN_FOR_MODULES TRUE)
-
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=1")
 endif()
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
+endif()
+
+
 if (${CMAKE_HOST_SYSTEM_NAME} MATCHES "Windows")
   set(TEST_LINK_FLAGS "")
   set(MODULE_OUTPUT_DIR ".")
@@ -33,6 +41,7 @@ if(BUILD_TESTS)
   find_package(benchmark REQUIRED)
 endif()
 
+find_package(OpenBLAS 0.3.27 REQUIRED)
 find_package(fmt 11.2.0 REQUIRED)
 
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GITREV)
@@ -106,6 +115,7 @@ if(BUILD_TESTS)
       Boost::log
       Boost::log_setup
       Boost::unit_test_framework
+      OpenBLAS::OpenBLAS
       trix_static
     )
     target_sources(${NEW_TEST} PRIVATE 
@@ -138,6 +148,7 @@ if(BUILD_TESTS)
       Boost::log
       Boost::log_setup
       Boost::unit_test_framework
+      OpenBLAS::OpenBLAS
       trix_static
     )
     add_test(${NEW_BENCHMARK} benchmarks/${NEW_BENCHMARK})

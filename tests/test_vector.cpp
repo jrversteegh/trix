@@ -1,13 +1,13 @@
 #include "test_common.h"
 
 #include <array>
-#include <vector>
 #include <ranges>
+#include <vector>
 
 #include <boost/test/parameterized_test.hpp>
 
-#include "trix/vector.h"
 #include "trix/printing.h"
+#include "trix/vector.h"
 
 namespace ut = boost::unit_test;
 namespace ranges = std::ranges;
@@ -36,11 +36,11 @@ BOOST_AUTO_TEST_CASE(vector3_construct_from_array_test) {
 BOOST_AUTO_TEST_CASE(vector3_construct_from_range_test) {
   auto const to_long = std::array{1., 2., 3., 4.};
   auto v1 = Vector<3>(std::from_range, to_long | ranges::views::take(4));
-  BOOST_TEST(v1== vector(1., 2., 3.));
+  BOOST_TEST(v1 == vector(1., 2., 3.));
   v1 = Vector<3>(std::from_range, to_long | ranges::views::take(3));
-  BOOST_TEST(v1== vector(1., 2., 3.));
+  BOOST_TEST(v1 == vector(1., 2., 3.));
   v1 = Vector<3>(std::from_range, to_long | ranges::views::take(2));
-  BOOST_TEST(v1== vector(1., 2., 0.));
+  BOOST_TEST(v1 == vector(1., 2., 0.));
 
   auto const to_short = std::array{1., 2.};
   auto v2 = Vector<3>(std::from_range, to_short);
@@ -51,22 +51,22 @@ BOOST_AUTO_TEST_CASE(vector3_construct_from_range_test) {
 
 struct VectorFixture {
   Vector<3> v3{
-    1.0, 2.0, 3.0,
+      1.0,
+      2.0,
+      3.0,
   };
   Vector<4> v4{
-    1.0, 2.0, 3.0, 4.0,
+      1.0,
+      2.0,
+      3.0,
+      4.0,
   };
   Number emv3{14.0};
   Number emv4{30.0};
   Number en3{std::sqrt(emv3)};
-  Vector<3> ea3{
-    2.0, 4.0, 6.0
-  };
-  Vector<4> ea4{
-    2.0, 4.0, 6.0, 8.0
-  };
+  Vector<3> ea3{2.0, 4.0, 6.0};
+  Vector<4> ea4{2.0, 4.0, 6.0, 8.0};
 };
-
 
 BOOST_FIXTURE_TEST_CASE(vector3_vector3_mul_test, VectorFixture) {
   auto r = v3 * v3;

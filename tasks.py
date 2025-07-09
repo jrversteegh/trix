@@ -20,6 +20,7 @@ def format(ctx):
         "isort .",
         f"clang-format -i {' '.join(glob.glob('include/trix/*.h'))}",
         f"clang-format -i {' '.join(glob.glob('src/*.cpp'))}",
+        f"clang-format -i {' '.join(glob.glob('tests/*.cpp'))}",
         # f"clang-format -i {' '.join(glob.glob('tests/*.cpp'))}",
         "pandoc -s -o README.md README.rst",
     ):
@@ -63,8 +64,9 @@ def create_build_dir(ctx):
 def build(ctx):
     """Build"""
     for cmd in (
+        f"conan export {script_dir}/conan/recipes/openblas/all --version=0.3.30",
         "poetry build -vv",
-        "conan create . --build=missing",
+        f"conan create . --build=missing --profile={script_dir}/conan/trix.profile",
     ):
         ctx.run(cmd, echo=True)
 

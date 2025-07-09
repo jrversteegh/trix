@@ -4,11 +4,12 @@ from datetime import datetime
 from pathlib import Path
 
 import tomli
-from conan import ConanFile
 from conan.errors import ConanInvalidConfiguration
 from conan.tools.cmake import CMake, CMakeToolchain, cmake_layout
 from conan.tools.files import copy
 from conan.tools.scm import Version
+
+from conan import ConanFile
 
 
 def get_project_version_and_date(source_dir):
@@ -46,13 +47,14 @@ class TrixConan(ConanFile):
 
     def requirements(self):
         self.requires("fmt/11.2.0")
+        self.requires("openblas/0.3.30")
 
     def validate(self):
         compiler = self.settings.compiler
         version = int(str(Version(self.settings.compiler.version)))
 
         if compiler == "gcc" and version < 15:
-            raise ConanInvalidConfiguration("GCC needs to be verion 15 or up")
+            raise ConanInvalidConfiguration("GCC needs to be version 15 or up")
 
     def generate(self):
         tc = CMakeToolchain(self)

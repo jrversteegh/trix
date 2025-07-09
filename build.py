@@ -66,7 +66,7 @@ def build_module(build_type, config=""):
     version, date = get_project_version_and_date()
     with dir_context(build_dir):
         if os.system(
-            f"conan install -of conan --build=missing -s build_type={build_type} {script_dir}/conanfile.txt"
+            f"conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} {script_dir}/conanfile.txt"
         ):
             raise Exception("Failed to run conan")
         if os.system(
