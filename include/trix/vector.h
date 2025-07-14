@@ -11,9 +11,6 @@
 #include <type_traits>
 #include <utility>
 
-#include <fmt/format.h>
-#include <fmt/ranges.h>
-
 #include "config.h"
 #include "types.h"
 
@@ -32,8 +29,6 @@ concept MutableVectorConcept = VectorConcept<V> && requires(V v, size_t i) {
   { v.operator[](i) } -> std::same_as<typename V::value_type&>;
 };
 
-struct VectorType {};
-
 template <size_t N, typename T>
 struct VectorStorageType {
   static constexpr size_t const components = N;
@@ -41,29 +36,35 @@ struct VectorStorageType {
   using value_type = T;
 };
 
-template <size_t N>
+template <size_t N, typename T>
 struct FullVectorType {
+  template <typename F, size_t... Is>
+    requires std::same_as<std::invoke_result_t<F, size_t>, void>
+  constexpr void for_each_element(F fun, std::index_sequence<Is...>) {
+    (fun(Is), ...);
+  }
+
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t>, void>
   constexpr void for_each_element(F fun) {
-    for (size_t i = 0; i < N; ++i) {
-      fun(i);
-    }
+    for_each_element(fun, std::make_index_sequence<N>{});
   }
 
-  template <typename F, typename R>
-    requires std::same_as<std::invoke_result_t<F, size_t>, R>
-  constexpr R sum_for_each_element(F fun, R) const {
-    R result{fun(0)};
-    for (size_t i = 1; i < N; ++i) {
-      result += fun(i);
-    }
-    return result;
+  template <typename F, size_t... Is>
+    requires std::same_as<std::invoke_result_t<F, size_t>, T>
+  constexpr auto sum_for_each_element(F fun, std::index_sequence<Is...>) const {
+    return (... + fun(Is));
+  }
+
+  template <typename F>
+    requires std::same_as<std::invoke_result_t<F, size_t>, T>
+  constexpr auto sum_for_each_element(F fun) const {
+    return sum_for_each_element(fun, std::make_index_sequence<N>{});
   }
 };
 
 template <typename STORAGE, size_t N, size_t SIZE, typename T = Number>
-struct VectorArrayStorage : VectorStorageType<N, T>, FullVectorType<N> {
+struct VectorArrayStorage : VectorStorageType<N, T>, FullVectorType<N, T> {
   static constexpr size_t elements = SIZE;
   template <std::convertible_to<T>... Values>
   explicit constexpr VectorArrayStorage(Values&&... values)
@@ -114,6 +115,11 @@ struct VectorGenericStorage
   }
 };
 
+template <size_t N, typename T = Number,
+          template <size_t, typename C> typename Storage = VectorGenericStorage>
+  requires(N > 0)
+struct Vector;
+
 template <VectorConcept V, size_t B, size_t E = V::components, size_t S = 1>
 struct Slice : VectorStorageType<(E - B - 1) / S + 1, typename V::value_type> {
   static constexpr size_t const start = B;
@@ -122,14 +128,14 @@ struct Slice : VectorStorageType<(E - B - 1) / S + 1, typename V::value_type> {
 
   constexpr Slice(V& vector) : vector_(vector) {}
 
-  constexpr auto operator[](size_t const index) const {
-    size_t const offset = start + index * stride;
+  constexpr auto operator[](size_t const i) const {
+    size_t const offset = start + i * stride;
     assert(offset < stop);
     return vector_[offset];
   }
 
-  constexpr auto& operator[](size_t const index) {
-    size_t const offset = start + index * stride;
+  constexpr auto& operator[](size_t const i) {
+    size_t const offset = start + i * stride;
     assert(offset < stop);
     return vector_[offset];
   }
@@ -138,10 +144,77 @@ private:
   V& vector_;
 };
 
-template <size_t N, typename T = Number,
-          template <size_t, typename C> typename Storage = VectorGenericStorage>
+template <VectorConcept V1, VectorConcept V2>
+struct CommonVector {
+  using type =
+      Vector<V1::components, std::common_type_t<typename V1::value_type,
+                                                typename V2::value_type>>;
+};
+
+template <VectorConcept V1, VectorConcept V2>
+using common_vector_t = CommonVector<V1, V2>::type;
+
+template <VectorConcept V, typename R = V>
+struct VectorUnaryOperation
+    : VectorStorageType<V::components, typename V::value_type> {
+  using arg_type = V;
+  using result_type = R;
+  explicit constexpr VectorUnaryOperation(V const& arg) : arg{arg} {}
+  constexpr operator result_type(this auto&& self) {
+    return result_type{self};
+  }
+
+protected:
+  V const& arg;
+};
+
+template <VectorConcept V>
+struct VectorNegation : VectorUnaryOperation<V> {
+  using VectorUnaryOperation<V>::VectorUnaryOperation;
+  constexpr auto operator[](size_t const i) const {
+    return -(this->arg[i]);
+  }
+};
+
+template <VectorConcept V1, VectorConcept V2,
+          typename R = common_vector_t<V1, V2>>
+struct VectorBinaryOperation
+    : VectorStorageType<V1::components,
+                        std::common_type_t<typename V1::value_type,
+                                           typename V2::value_type>> {
+  using arg1_type = V1;
+  using arg2_type = V2;
+  using result_type = R;
+  explicit constexpr VectorBinaryOperation(V1 const& arg1, V2 const& arg2)
+      : arg1{arg1}, arg2{arg2} {}
+  constexpr operator result_type(this auto&& self) {
+    return result_type{self};
+  }
+
+protected:
+  V1 const& arg1;
+  V2 const& arg2;
+};
+
+template <VectorConcept V1, VectorConcept V2>
+struct VectorAddition : VectorBinaryOperation<V1, V2> {
+  using VectorBinaryOperation<V1, V2>::VectorBinaryOperation;
+  constexpr auto operator[](size_t const i) const {
+    return this->arg1[i] + this->arg2[i];
+  }
+};
+
+template <VectorConcept V1, VectorConcept V2>
+struct VectorSubtraction : VectorBinaryOperation<V1, V2> {
+  using VectorBinaryOperation<V1, V2>::VectorBinaryOperation;
+  constexpr auto operator[](size_t const i) const {
+    return this->arg1[i] - this->arg2[i];
+  }
+};
+
+template <size_t N, typename T, template <size_t, typename C> typename Storage>
   requires(N > 0)
-struct Vector : Storage<N, T>, VectorType {
+struct Vector : Storage<N, T> {
   using Storage<N, T>::Storage;
   template <VectorConcept O>
     requires(O::components >= Vector::components)
@@ -171,13 +244,13 @@ struct Vector : Storage<N, T>, VectorType {
     return *this;
   }
 
-  constexpr Vector operator-() const {
-    return Vector{} - *this;
+  constexpr auto operator-() const {
+    return VectorNegation<Vector>{*this};
   }
 
   constexpr T norm() const {
     return std::sqrt(this->sum_for_each_element(
-        [this](size_t i) { return (*this)[i] * (*this)[i]; }, T{}));
+        [this](size_t i) { return (*this)[i] * (*this)[i]; }));
   }
 
   constexpr auto length() const {
@@ -209,7 +282,7 @@ auto vector(C&& first, Cs&&... components) {
 
 template <VectorConcept V1, VectorConcept V2, size_t... Is>
 constexpr bool equals(V1 const& v1, V2 const& v2, std::index_sequence<Is...>) {
-  return ((v1[Is] == v2[Is]) && ...);
+  return (... && (v1[Is] == v2[Is]));
 }
 
 template <VectorConcept V1, VectorConcept V2>
@@ -259,15 +332,18 @@ constexpr auto operator*(S const value, V const& v) {
   return v * value;
 }
 
+template <VectorConcept V1, VectorConcept V2, size_t... Is>
+  requires(V1::components == V2::components)
+constexpr auto dot(V1 const& v1, V2 const& v2, std::index_sequence<Is...>) {
+  std::common_type_t<typename V1::value_type, typename V2::value_type> result{
+      (... + (v1[Is] * v2[Is]))};
+  return result;
+}
+
 template <VectorConcept V1, VectorConcept V2>
   requires(V1::components == V2::components)
 constexpr auto operator*(V1 const& v1, V2 const& v2) {
-  std::common_type_t<typename V1::value_type, typename V2::value_type> result{
-      v1[0] * v2[0]};
-  for (size_t i = 1; i < V1::components; ++i) {
-    result += v1[i] * v2[i];
-  }
-  return result;
+  return dot(v1, v2, std::make_index_sequence<V1::components>{});
 }
 
 template <VectorConcept V1, VectorConcept V2>

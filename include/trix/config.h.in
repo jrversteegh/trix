@@ -16,6 +16,19 @@
 
 #cmakedefine NUMBER_FORMAT @NUMBER_FORMAT@
 #cmakedefine FORMAT_STRING @FORMAT_STRING@
+#cmakedefine HAVE_MKL @HAVE_MKL@
+#cmakedefine HAVE_OPENBLAS @HAVE_OPENBLAS@
+#cmakedefine HAVE_EIGEN @HAVE_EIGEN@
+
+#ifdef HAVE_MKL
+#include <mkl.h>
+#define HAVE_BLAS 1
+#elif defined(HAVE_OPENBLAS)
+#include <cblas.h>
+#define HAVE_BLAS 1
+#else
+#warning "No BLAS available"
+#endif
 
 namespace trix {
 

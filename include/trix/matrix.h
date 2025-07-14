@@ -11,8 +11,6 @@
 #include <type_traits>
 #include <utility>
 
-#include <cblas.h>
-
 #include "config.h"
 #include "types.h"
 #include "utils.h"
@@ -171,14 +169,16 @@ struct GenericStorage
     return i * M + j;
   }
 
+#ifdef HAVE_BLAS
   template <size_t K>
     requires(std::is_same_v<T, double>)
-  auto mul(GenericStorage<M, K, T> const& other) const {
+  auto blas_mul(GenericStorage<M, K, T> const& other) const {
     Matrix<N, K, double, GenericStorage> result;
     cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, N, K, M, 1.0,
                 this->data(), M, other.data(), K, 0.0, result.data(), K);
     return result;
   }
+#endif
 };
 
 template <size_t N, size_t M = N, typename T = Number>
@@ -559,12 +559,14 @@ constexpr auto operator*(Matrix<N, K, T1> const& x1,
 }
 #endif
 
+#ifdef HAVE_BLAS
 template <size_t N, size_t K, size_t M>
 constexpr auto blas_mul(GenericStorage<N, K, double> const& x1,
                         GenericStorage<K, M, double> const& x2) {
-  auto result = x1.mul(x2);
+  auto result = x1.blas_mul(x2);
   return result;
 }
+#endif
 
 template <size_t N, typename T1, typename T2>
 constexpr auto operator*(SymmetricMatrix<N, T1> const& x1,

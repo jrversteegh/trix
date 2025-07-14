@@ -4,9 +4,15 @@
 
 #include <benchmark/benchmark.h>
 
+#include "trix/config.h"
 #include "trix/matrix.h"
+#include "trix/printing.h"
 #include "trix/types.h"
 #include "trix/vector.h"
+
+#ifdef HAVE_EIGEN
+#include <Eigen/Dense>
+#endif
 
 using namespace trix;
 
@@ -30,6 +36,16 @@ auto get_random_matrix() {
   return Matrix<N, N>(IndexIterator{gen, 0}, IndexIterator{gen, N * N});
 }
 
+#ifdef HAVE_EIGEN
+template <size_t N = 4>
+auto get_random_eigen() {
+  Eigen::Matrix<Number, N, N, Eigen::RowMajor> result;
+  result << r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r(), r(),
+      r(), r(), r();
+  return result;
+}
+#endif
+
 template <size_t N = 4>
 auto get_random_symmetric() {
   auto gen = RandomGenerator();
@@ -52,13 +68,32 @@ static void benchmark_matrix_mul(benchmark::State& state) {
   auto m2 = get_random_matrix();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    // Number of loops tuned so it takes ~1mus on i9 13k9 compiled with GCC 15.1
-    for (int i = 0; i < 190; ++i) {
-      auto value = m1 * m2;
-      benchmark::DoNotOptimize(value);
-    }
+    auto value = m1 * m2;
+    benchmark::DoNotOptimize(value);
   }
 }
+BENCHMARK(benchmark_matrix_mul);
+
+#ifdef HAVE_EIGEN
+static void benchmark_eigen_mul(benchmark::State& state) {
+  auto m1 = get_random_eigen();
+  benchmark::DoNotOptimize(m1);
+  auto m2 = get_random_eigen();
+  benchmark::DoNotOptimize(m2);
+  for (auto _ : state) {
+    decltype(m1) value = m1 * m2;
+    benchmark::DoNotOptimize(value);
+  }
+  decltype(m1) value = m1 * m2;
+  auto t1 = Matrix<m1.rows(), m1.cols()>{m1.data(), m1.data() + m1.size()};
+  auto t2 = Matrix<m2.rows(), m2.cols()>{m2.data(), m2.data() + m2.size()};
+  auto result = Matrix<value.rows(), value.cols()>{value.data(),
+                                                   value.data() + value.size()};
+  auto expected = t1 * t2;
+  assert(all_close(result, expected));
+}
+BENCHMARK(benchmark_eigen_mul);
+#endif
 
 static void benchmark_matrix_equality(benchmark::State& state) {
   auto m1 = get_random_matrix();
@@ -66,13 +101,11 @@ static void benchmark_matrix_equality(benchmark::State& state) {
   auto m2 = m1;
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    // Number of loops tuned so it takes ~1mus on i9 13k9 compiled with GCC 15.1
-    for (int i = 0; i < 206; ++i) {
-      auto value = m1 == m2;
-      benchmark::DoNotOptimize(value);
-    }
+    auto value = m1 == m2;
+    benchmark::DoNotOptimize(value);
   }
 }
+BENCHMARK(benchmark_matrix_equality);
 
 static void benchmark_symmetric_mul(benchmark::State& state) {
   auto m1 = get_random_symmetric();
@@ -80,13 +113,11 @@ static void benchmark_symmetric_mul(benchmark::State& state) {
   auto m2 = get_random_symmetric();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    // Number of loops tuned so it takes ~1mus on i9 13k9 compiled with GCC 15.1
-    for (int i = 0; i < 170; ++i) {
-      auto value = m1 * m2;
-      benchmark::DoNotOptimize(value);
-    }
+    auto value = m1 * m2;
+    benchmark::DoNotOptimize(value);
   }
 }
+BENCHMARK(benchmark_symmetric_mul);
 
 static void benchmark_symmetric_equality(benchmark::State& state) {
   auto m1 = get_random_symmetric();
@@ -94,13 +125,11 @@ static void benchmark_symmetric_equality(benchmark::State& state) {
   auto m2 = m1;
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    // Number of loops tuned so it takes ~1mus on i9 13k9 compiled with GCC 15.1
-    for (int i = 0; i < 325; ++i) {
-      auto value = m1 == m2;
-      benchmark::DoNotOptimize(value);
-    }
+    auto value = m1 == m2;
+    benchmark::DoNotOptimize(value);
   }
 }
+BENCHMARK(benchmark_symmetric_equality);
 
 static void benchmark_diagonal_mul(benchmark::State& state) {
   auto m1 = get_random_diagonal();
@@ -108,13 +137,11 @@ static void benchmark_diagonal_mul(benchmark::State& state) {
   auto m2 = get_random_diagonal();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    // Number of loops tuned so it takes ~1mus on i9 13k9 compiled with GCC 15.1
-    for (int i = 0; i < 2765; ++i) {
-      auto value = m1 * m2;
-      benchmark::DoNotOptimize(value);
-    }
+    auto value = m1 * m2;
+    benchmark::DoNotOptimize(value);
   }
 }
+BENCHMARK(benchmark_diagonal_mul);
 
 static void benchmark_diagonal_equality(benchmark::State& state) {
   auto m1 = get_random_diagonal();
@@ -122,32 +149,21 @@ static void benchmark_diagonal_equality(benchmark::State& state) {
   auto m2 = m1;
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    // Number of loops tuned so it takes ~1mus on i9 13k9 compiled with GCC 15.1
-    for (int i = 0; i < 780; ++i) {
-      auto value = m1 == m2;
-      benchmark::DoNotOptimize(value);
-    }
+    auto value = m1 == m2;
+    benchmark::DoNotOptimize(value);
   }
 }
-
-BENCHMARK(benchmark_matrix_mul);
-BENCHMARK(benchmark_matrix_equality);
-BENCHMARK(benchmark_symmetric_mul);
-BENCHMARK(benchmark_symmetric_equality);
-BENCHMARK(benchmark_diagonal_mul);
 BENCHMARK(benchmark_diagonal_equality);
 
 static void benchmark_vector_op_minus(benchmark::State& state) {
   auto v = get_random_vector();
   benchmark::DoNotOptimize(v);
   for (auto _ : state) {
-    // Number of loops tuned so it takes ~1mus on i9 13k9 compiled with GCC 15.1
-    for (int i = 0; i < 1300; ++i) {
-      auto value = -v;
-      benchmark::DoNotOptimize(value);
-    }
+    auto value = -v;
+    benchmark::DoNotOptimize(value);
   }
 }
+BENCHMARK(benchmark_vector_op_minus);
 
 static void benchmark_vector_equality(benchmark::State& state) {
   auto v1 = get_random_vector();
@@ -155,15 +171,10 @@ static void benchmark_vector_equality(benchmark::State& state) {
   auto v2 = v1;
   benchmark::DoNotOptimize(v2);
   for (auto _ : state) {
-    // Number of loops tuned so it takes ~1mus on i9 13k9 compiled with GCC 15.1
-    for (int i = 0; i < 322; ++i) {
-      auto value = v1 == v2;
-      benchmark::DoNotOptimize(value);
-    }
+    auto value = v1 == v2;
+    benchmark::DoNotOptimize(value);
   }
 }
-
-BENCHMARK(benchmark_vector_op_minus);
 BENCHMARK(benchmark_vector_equality);
 
 constexpr size_t size = 128;
@@ -179,6 +190,7 @@ static void benchmark_matrix_star_operator(benchmark::State& state) {
     benchmark::DoNotOptimize(value);
   }
 }
+BENCHMARK(benchmark_matrix_star_operator);
 
 static void benchmark_matrix_strassen(benchmark::State& state) {
   auto m1 = get_random_matrix<size>();
@@ -191,9 +203,9 @@ static void benchmark_matrix_strassen(benchmark::State& state) {
   }
   auto m = m1 * m2;
   auto s = strassen(m1, m2);
-  assert(m != s);
   assert(all_close(m, s, 1E-10));
 }
+BENCHMARK(benchmark_matrix_strassen);
 
 static void benchmark_matrix_block_mul(benchmark::State& state) {
   auto m1 = get_random_matrix<size>();
@@ -206,9 +218,9 @@ static void benchmark_matrix_block_mul(benchmark::State& state) {
   }
   auto m = m1 * m2;
   auto s = block_mul(m1, m2);
-  assert(m != s);
   assert(all_close(m, s, 1E-10));
 }
+BENCHMARK(benchmark_matrix_block_mul);
 
 static void benchmark_matrix_blas_mul(benchmark::State& state) {
   auto m1 = get_random_matrix<size>();
@@ -221,13 +233,8 @@ static void benchmark_matrix_blas_mul(benchmark::State& state) {
   }
   auto m = m1 * m2;
   auto s = blas_mul(m1, m2);
-  assert(m != s);
   assert(all_close(m, s, 1E-10));
 }
-
-BENCHMARK(benchmark_matrix_star_operator);
-BENCHMARK(benchmark_matrix_strassen);
-BENCHMARK(benchmark_matrix_block_mul);
 BENCHMARK(benchmark_matrix_blas_mul);
 
 BENCHMARK_MAIN();

@@ -45,6 +45,23 @@ def test(ctx):
 
 
 @task
+def benchmark(ctx):
+    """Run tests"""
+    for cmd in ("build/benchmarks/test_performance",):
+        num_threads = 1
+        ctx.run(
+            cmd,
+            echo=True,
+            env={
+                "OPENBLAS_NUM_THREADS": f"{num_threads}",
+                "OMP_NUM_THREADS": f"{num_threads}",
+                "MKL_NUM_THREADS": f"{num_threads}",
+                "MKL_DYNAMIC": "FALSE",
+            },
+        )
+
+
+@task
 def update_revision(ctx):
     repo = Repo()
     ref = repo.head.object.hexsha[:8]

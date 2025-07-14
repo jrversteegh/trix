@@ -19,7 +19,7 @@ module_name = "trixx"
 if "CXX" in os.environ:
     compiler = os.environ["CXX"]
 else:
-    compiler = "g++-15"
+    compiler = "g++"
 
 on_windows = platform.system().startswith("Win")
 script_dir = Path(__file__).absolute().parent

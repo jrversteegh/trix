@@ -1,6 +1,6 @@
 sources:
   "0.3.30":
-    url: "https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz"
+    url: "https://github.com/xianyi/OpenBLAS/archive/v0.3.30.tar.gz"
     sha256: "27342cff518646afb4c2b976d809102e368957974c250a25ccc965e53063c95d"
   "0.3.27":
     url: "https://github.com/xianyi/OpenBLAS/archive/v0.3.27.tar.gz"

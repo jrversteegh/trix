@@ -6,18 +6,26 @@ if(NOT DEFINED ${CMAKE_BUILD_TYPE})
   set (CMAKE_BUILD_TYPE Release)
 endif()
 
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+#set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-march=native")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_CXX_SCAN_FOR_MODULES TRUE)
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=1")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+    message(FATAL_ERROR "g++ 14 or new required. Set environment variable CXX to a newer g++")
+  endif()
 endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ferror-limit=1")
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19)
+    message(FATAL_ERROR "clang++ 19 or new required. Set environment variable CXX to a newer clang++")
+  endif()
 endif()
 
 
@@ -41,7 +49,20 @@ if(BUILD_TESTS)
   find_package(benchmark REQUIRED)
 endif()
 
-find_package(OpenBLAS 0.3.27 REQUIRED)
+find_package(MKL QUIET)
+if (TARGET MKL::MKL)
+  add_library(BLAS::BLAS ALIAS MKL::MKL)
+  set(HAVE_MKL 1)
+else()
+  find_package(OpenBLAS REQUIRED)
+  add_library(BLAS::BLAS ALIAS OpenBLAS::OpenBLAS)
+  set(HAVE_OPENBLAS 1)
+endif()
+find_package(Eigen3 REQUIRED NO_MODULE)
+if (TARGET Eigen3::Eigen)
+  set(HAVE_EIGEN 1)
+endif()
+
 find_package(fmt 11.2.0 REQUIRED)
 
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GITREV)
@@ -62,6 +83,7 @@ include_directories(
   ${Boost_INCLUDE_DIR}
   ${pybind11_INCLUDE_DIR}
   ${fmt_INCLUDE_DIR}
+  ${EIGEN3_INCLUDE_DIR}
   ${TRIX_INCLUDE_DIR}
 )
 add_compile_definitions(
@@ -115,7 +137,7 @@ if(BUILD_TESTS)
       Boost::log
       Boost::log_setup
       Boost::unit_test_framework
-      OpenBLAS::OpenBLAS
+      BLAS::BLAS
       trix_static
     )
     target_sources(${NEW_TEST} PRIVATE 
@@ -148,7 +170,7 @@ if(BUILD_TESTS)
       Boost::log
       Boost::log_setup
       Boost::unit_test_framework
-      OpenBLAS::OpenBLAS
+      BLAS::BLAS
       trix_static
     )
     add_test(${NEW_BENCHMARK} benchmarks/${NEW_BENCHMARK})
@@ -156,6 +178,8 @@ if(BUILD_TESTS)
 
   new_test(test_vector)
   new_test(test_matrix)
-  new_test(test_module)
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 15)
+    new_test(test_module)
+  endif()
   new_benchmark(test_performance)
 endif()
