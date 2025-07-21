@@ -27,18 +27,19 @@ template <size_t N, size_t M = N, typename T = Number,
   requires(N > 0 && M > 0)
 struct Matrix;
 
-template <typename M>
-concept MatrixConcept = requires(M const m, size_t i, size_t j) {
-  typename M::value_type;
-  { m.operator[](i, j) } -> std::same_as<typename M::value_type>;
-  { M::rows } -> std::convertible_to<size_t const>;
-  { M::columns } -> std::convertible_to<size_t const>;
+template <typename X>
+concept MatrixConcept = requires(noref<X> const x, size_t i, size_t j) {
+  typename noref<X>::value_type;
+  typename noref<X>::result_type;
+  { x.operator[](i, j) } -> std::same_as<typename noref<X>::value_type>;
+  { noref<X>::rows } -> std::convertible_to<size_t const>;
+  { noref<X>::columns } -> std::convertible_to<size_t const>;
 };
 
-template <typename M>
+template <typename X>
 concept MutableMatrixConcept =
-    MatrixConcept<M> && requires(M m, size_t i, size_t j) {
-      { m.operator[](i, j) } -> std::same_as<typename M::value_type&>;
+    MatrixConcept<X> && requires(X x, size_t i, size_t j) {
+      { x.operator[](i, j) } -> std::same_as<typename X::value_type&>;
     };
 
 template <size_t N, size_t M, typename T>
@@ -50,15 +51,15 @@ struct MatrixStorageType {
 
 template <size_t N, size_t M>
 struct MatrixAssignment {
-  template <typename Self, MatrixConcept O, size_t... Is>
-  constexpr void row_assign(this Self&& self, O const& o, size_t i,
-                            std::index_sequence<Is...>) {
-    ((self[i, Is] = o[i, Is]), ...);
+  template <typename Self, MatrixConcept O, size_t... Js>
+  constexpr void row_assign(this Self& self, O const& o, size_t i,
+                            std::index_sequence<Js...>) {
+    ((self[i, Js] = o[i, Js]), ...);
   }
 
   template <typename Self, MatrixConcept O>
     requires(O::rows == N && O::columns == M)
-  constexpr auto& operator=(this Self&& self, O const& o) {
+  constexpr auto& operator=(this Self& self, O const& o) {
     for (size_t i = 0; i < N; ++i) {
       self.row_assign(o, i, std::make_index_sequence<M>{});
     }
@@ -110,10 +111,9 @@ struct DiagonalType : DiagonalBase {
   }
 };
 
-template <typename STORAGE, size_t N, size_t M, size_t SIZE,
-          typename T = Number>
+template <typename Impl, size_t N, size_t M, size_t S, typename T = Number>
 struct MatrixArrayStorage : MatrixStorageType<N, M, T> {
-  static constexpr size_t elements = SIZE;
+  static constexpr size_t elements = S;
   template <std::convertible_to<T>... Values>
   constexpr MatrixArrayStorage(Values&&... values)
       : a_{std::forward<Values>(values)...} {};
@@ -125,7 +125,7 @@ struct MatrixArrayStorage : MatrixStorageType<N, M, T> {
     requires std::convertible_to<typename std::iterator_traits<It>::value_type,
                                  T>
   constexpr MatrixArrayStorage(It first, Ite last) {
-    for (size_t i = 0; i < SIZE; ++i) {
+    for (size_t i = 0; i < elements; ++i) {
       if (first == last)
         break;
       a_[i] = *first++;
@@ -134,6 +134,7 @@ struct MatrixArrayStorage : MatrixStorageType<N, M, T> {
   template <std::ranges::input_range R>
   constexpr MatrixArrayStorage(std::from_range_t, R const& r)
       : MatrixArrayStorage(r.begin(), r.end()) {}
+
   constexpr T operator[](size_t const i, size_t const j) const {
     return a_[check_and_get_offset_(i, j)];
   }
@@ -153,7 +154,7 @@ private:
   std::array<T, elements> a_{};
   static constexpr size_t check_and_get_offset_(size_t const i,
                                                 size_t const j) {
-    size_t offset = STORAGE::get_offset(i, j);
+    size_t offset = Impl::get_offset(i, j);
     assert(offset < elements);
     return offset;
   }
@@ -233,6 +234,181 @@ struct IdentityStorage : DiagonalType<N>, MatrixStorageType<N, N, T> {
   }
 };
 
+template <size_t I>
+struct RowAt {
+  template <MatrixConcept X1, MatrixConcept X2, size_t... Js>
+  static constexpr bool equals(X1 const& x1, X2 const& x2,
+                               std::index_sequence<Js...>) {
+    return (... && (x1[I, Js] == x2[I, Js]));
+  }
+  template <MatrixConcept X1, MatrixConcept X2, typename value_type,
+            size_t... Js>
+  static constexpr bool close(X1 const& x1, X2 const& x2, value_type threshold,
+                              std::index_sequence<Js...>) {
+    return (... && (std::abs(x1[I, Js] - x2[I, Js]) > threshold));
+  }
+};
+
+template <MatrixConcept X1, MatrixConcept X2>
+struct CommonMatrix {
+  using value_type =
+      std::common_type_t<typename X1::value_type, typename X2::value_type>;
+  using type = std::conditional_t<
+      std::is_convertible_v<typename X1::result_type, DiagonalBase> &&
+          std::is_convertible_v<typename X2::result_type, DiagonalBase>,
+      Matrix<X1::rows, X2::columns, value_type, DiagonalStorage>,
+      std::conditional_t<
+          std::is_convertible_v<typename X1::result_type, SymmetricBase> &&
+              std::is_convertible_v<typename X2::result_type, SymmetricBase>,
+          Matrix<X1::rows, X2::columns, value_type, SymmetricStorage>,
+          Matrix<X1::rows, X2::columns, value_type>>>;
+};
+
+template <MatrixConcept X1, MatrixConcept X2>
+using common_matrix_t = CommonMatrix<typename noref<X1>::result_type,
+                                     typename noref<X2>::result_type>::type;
+
+template <typename R>
+struct ResultType {
+  using result_type = R;
+  template <class Self>
+  explicit constexpr operator result_type(this Self&& self) {
+    return result_type{self};
+  }
+  template <class Self>
+  constexpr auto operator()(this Self&& self) {
+    return static_cast<result_type>(self);
+  }
+};
+
+template <MatrixConcept X, typename R = typename X::result_type>
+struct MatrixUnaryOperation
+    : MatrixStorageType<R::rows, R::columns, typename R::value_type>,
+      ResultType<R> {
+  using arg_type = make_const<X>;
+  MatrixUnaryOperation() = delete;
+  explicit constexpr MatrixUnaryOperation(X&& arg)
+      : arg{std::forward<X>(arg)} {}
+  arg_type arg;
+};
+
+template <MatrixConcept X1, MatrixConcept X2,
+          typename R = common_matrix_t<X1, X2>>
+struct MatrixBinaryOperation
+    : MatrixStorageType<R::rows, R::columns, typename R::value_type>,
+      ResultType<R> {
+  using arg1_type = make_const<X1>;
+  using arg2_type = make_const<X2>;
+  MatrixBinaryOperation() = delete;
+  constexpr MatrixBinaryOperation(X1&& arg1, X2&& arg2)
+      : arg1{std::forward<X1>(arg1)}, arg2{std::forward<X2>(arg2)} {}
+  arg1_type arg1;
+  arg2_type arg2;
+};
+
+template <MatrixConcept X, VectorConcept V, bool reversed,
+          typename R = std::conditional_t<
+              reversed,
+              Vector<noref<X>::columns,
+                     std::common_type_t<typename noref<X>::value_type,
+                                        typename noref<V>::value_type>>,
+              Vector<noref<X>::rows,
+                     std::common_type_t<typename noref<X>::value_type,
+                                        typename noref<V>::value_type>>>>
+struct MatrixVectorOperation
+    : VectorStorageType<R::components, typename R::value_type>,
+      ResultType<R> {
+  using arg1_type = make_const<X>;
+  using arg2_type = make_const<V>;
+  using result_type = R;
+  MatrixVectorOperation() = delete;
+  constexpr MatrixVectorOperation(X&& arg1, V&& arg2)
+      : arg1{std::forward<X>(arg1)}, arg2{std::forward<V>(arg2)} {}
+  arg1_type arg1;
+  arg2_type arg2;
+};
+
+template <MatrixConcept X, ScalarConcept S,
+          typename R = typename noref<X>::result_type::template retyped<
+              std::common_type_t<typename noref<X>::value_type, S>>>
+struct MatrixScalarOperation
+    : MatrixStorageType<R::rows, R::columns, typename R::value_type>,
+      ResultType<R> {
+  using arg1_type = make_const<X>;
+  using arg2_type = make_const<S>;
+  using result_type = R;
+  MatrixScalarOperation() = delete;
+  constexpr MatrixScalarOperation(X&& arg1, S const arg2)
+      : arg1{std::forward<X>(arg1)}, arg2{arg2} {}
+  arg1_type arg1;
+  arg2_type arg2;
+};
+
+template <MatrixConcept X>
+struct MatrixNegation : MatrixUnaryOperation<X> {
+  using MatrixUnaryOperation<X>::MatrixUnaryOperation;
+  constexpr auto operator[](size_t const i, size_t const j) const {
+    return -(this->arg[i, j]);
+  }
+};
+
+template <MatrixConcept X1, MatrixConcept X2>
+struct MatrixAddition : MatrixBinaryOperation<X1, X2> {
+  using MatrixBinaryOperation<X1, X2>::MatrixBinaryOperation;
+  constexpr auto operator[](size_t const i, size_t const j) const {
+    return this->arg1[i, j] + this->arg2[i, j];
+  }
+};
+
+template <MatrixConcept X1, MatrixConcept X2>
+struct MatrixSubtraction : MatrixBinaryOperation<X1, X2> {
+  using MatrixBinaryOperation<X1, X2>::MatrixBinaryOperation;
+  constexpr auto operator[](size_t const i, size_t const j) const {
+    return this->arg1[i, j] - this->arg2[i, j];
+  }
+};
+
+template <MatrixConcept X1, MatrixConcept X2>
+struct MatrixMultiplication : MatrixBinaryOperation<X1, X2> {
+  using MatrixBinaryOperation<X1, X2>::MatrixBinaryOperation;
+  template <size_t... Ks>
+  constexpr auto dot(size_t const i, size_t const j,
+                     std::index_sequence<Ks...>) const {
+    return ((this->arg1[i, Ks] * this->arg2[Ks, j]) + ...);
+  }
+
+  constexpr auto operator[](size_t const i, size_t const j) const {
+    return dot(i, j, std::make_index_sequence<noref<X1>::columns>{});
+  }
+};
+
+template <MatrixConcept X, VectorConcept V, bool reversed>
+struct MatrixVectorMultiplication : MatrixVectorOperation<X, V, reversed> {
+  using MatrixVectorOperation<X, V, reversed>::MatrixVectorOperation;
+
+  template <size_t... Is>
+  constexpr auto dot(size_t const i, std::index_sequence<Is...>) const {
+    if constexpr (reversed) {
+      return ((this->arg1[Is, i] * this->arg2[Is]) + ...);
+    } else {
+      return ((this->arg1[i, Is] * this->arg2[Is]) + ...);
+    }
+  }
+
+  constexpr auto operator[](size_t const i) const {
+    return dot(i, std::make_index_sequence<noref<V>::components>{});
+  }
+};
+
+template <MatrixConcept X, ScalarConcept S>
+struct MatrixScalarMultiplication : MatrixScalarOperation<X, S> {
+  using MatrixScalarOperation<X, S>::MatrixScalarOperation;
+
+  constexpr auto operator[](size_t const i, size_t const j) const {
+    return this->arg1[i, j] * this->arg2;
+  }
+};
+
 template <MatrixConcept X>
 struct MatrixView {
   explicit constexpr MatrixView(X& x) : matrix{x} {};
@@ -243,6 +419,8 @@ template <MatrixConcept X>
 struct Transpose
     : MatrixView<X>,
       MatrixStorageType<X::columns, X::rows, typename X::value_type> {
+  using result_type =
+      typename X::result_type::template resized<X::columns, X::rows>;
   using MatrixView<X>::MatrixView;
 
   constexpr auto& operator[](size_t const i, size_t const j) {
@@ -259,6 +437,7 @@ struct SubMatrix : MatrixView<X>,
                    MatrixAssignment<N, M> {
   using MatrixView<X>::MatrixView;
   using MatrixAssignment<N, M>::operator=;
+  using result_type = typename X::result_type::template resized<N, M>;
   constexpr auto& operator[](size_t const i, size_t const j) {
     static typename X::value_type zero = 0;
     assert(i < N);
@@ -277,24 +456,23 @@ struct SubMatrix : MatrixView<X>,
     size_t p = I + i;
     size_t q = J + j;
     if (p < X::rows && q < X::columns) {
-      return this->matrix[p, q];
+      return std::as_const(this->matrix)[p, q];
     } else {
       return static_cast<typename X::value_type>(0);
     }
   }
 };
 
-template <MatrixConcept X>
-struct Diagonal
-    : MatrixView<X>,
-      VectorStorageType<std::min(X::rows, X::columns), typename X::value_type> {
+template <MatrixConcept X, size_t C = std::min(X::rows, X::columns)>
+struct Diagonal : MatrixView<X>, VectorStorageType<C, typename X::value_type> {
   using MatrixView<X>::MatrixView;
+  using result_type = Vector<C, typename X::value_type>;
 
   constexpr auto& operator[](size_t const i) {
     return this->matrix[i, i];
   }
   constexpr auto operator[](size_t const i) const {
-    return this->matrix[i, i];
+    return std::as_const(this->matrix)[i, i];
   }
 };
 
@@ -310,11 +488,12 @@ template <MatrixConcept X, size_t S>
 struct Row : RowColumnView<X, S>,
              VectorStorageType<X::columns, typename X::value_type> {
   using RowColumnView<X, S>::RowColumnView;
+  using result_type = Vector<S, typename X::value_type>;
   constexpr auto& operator[](size_t const i) {
     return this->matrix[this->index, i];
   }
   constexpr auto operator[](size_t const i) const {
-    return this->matrix[this->index, i];
+    return std::as_const(this->matrix)[this->index, i];
   }
 };
 
@@ -322,11 +501,12 @@ template <MatrixConcept X, size_t S>
 struct Column : RowColumnView<X, S>,
                 VectorStorageType<X::rows, typename X::value_type> {
   using RowColumnView<X, S>::RowColumnView;
+  using result_type = Vector<S, typename X::value_type>;
   constexpr auto& operator[](size_t const i) {
     return this->matrix[i, this->index];
   }
   constexpr auto operator[](size_t const i) const {
-    return this->matrix[i, this->index];
+    return std::as_const(this->matrix)[i, this->index];
   }
 };
 
@@ -334,10 +514,15 @@ template <size_t N, size_t M, typename T,
           template <size_t, size_t, typename C> typename Storage>
   requires(N > 0 && M > 0)
 struct Matrix : Storage<N, M, T> {
-  using Storage<N, M, T>::Storage;
+  using storage = Storage<N, M, T>;
+  using storage::storage;
+  using result_type = Matrix;
+  template <size_t P, size_t Q>
+  using resized = Matrix<P, Q, T, Storage>;
+  template <typename V>
+  using retyped = Matrix<N, M, V, Storage>;
   template <MatrixConcept O>
-  explicit constexpr Matrix(O const& other)
-      : Storage<O::rows, O::columns, typename O::value_type>{} {
+  explicit constexpr Matrix(O const& other) : storage{} {
     this->for_each_element(
         [this, &other](size_t i, size_t j) { (*this)[i, j] = other[i, j]; });
   }
@@ -366,26 +551,25 @@ struct Matrix : Storage<N, M, T> {
 
   template <typename Self>
   constexpr auto& transpose(this Self&& self) {
-    static auto result = Transpose<std::remove_reference_t<Self>>{self};
+    static auto result = Transpose<noref<Self>>{self};
     return result;
   }
 
   template <typename Self>
   constexpr auto& diagonal(this Self&& self) {
-    static auto result = Diagonal<std::remove_reference_t<Self>>{self};
+    static auto result = Diagonal<noref<Self>>{self};
     return result;
   }
 
   template <typename Self>
   constexpr auto& row(this Self&& self, size_t const i) {
-    static auto result = Row<std::remove_reference_t<Self>, self.rows>{self, i};
+    static auto result = Row<noref<Self>, self.rows>{self, i};
     return result;
   }
 
   template <typename Self>
   constexpr auto& column(this Self&& self, size_t const i) {
-    static auto result =
-        Column<std::remove_reference_t<Self>, self.columns>{self, i};
+    static auto result = Column<noref<Self>, self.columns>{self, i};
     return result;
   }
 };
@@ -407,15 +591,9 @@ auto matrix(C&& first, Cs&&... components) {
 }
 
 template <MatrixConcept X1, MatrixConcept X2, size_t... Is>
-constexpr bool row_equals(X1 const& x1, X2 const& x2, size_t i,
-                          std::index_sequence<Is...>) {
-  return (... && (x1[i, Is] == x2[i, Is]));
-}
-
-template <MatrixConcept X1, MatrixConcept X2, size_t... Is>
 constexpr bool equals(X1 const& x1, X2 const& x2, std::index_sequence<Is...>) {
   return (... &&
-          (row_equals(x1, x2, Is, std::make_index_sequence<X1::columns>{})));
+          (RowAt<Is>::equals(x1, x2, std::make_index_sequence<X1::columns>{})));
 }
 
 template <MatrixConcept X1, MatrixConcept X2>
@@ -424,140 +602,66 @@ constexpr bool operator==(X1 const& x1, X2 const& x2) {
   return equals(x1, x2, std::make_index_sequence<X1::rows>{});
 }
 
-template <MatrixConcept X1, MatrixConcept X2>
-  requires(X1::rows == X2::rows && X1::columns == X2::columns)
-constexpr auto operator+(X1 const& x1, X2 const& x2) {
-  Matrix<X1::rows, X1::columns,
-         std::common_type_t<typename X1::value_type, typename X2::value_type>>
-      result{x1};
-  result += x2;
-  return result;
-}
-
-template <size_t N, typename T1, typename T2,
-          template <size_t, size_t, typename> typename S1,
-          template <size_t, size_t, typename> typename S2>
-  requires std::derived_from<Matrix<N, N, T1, S1>, SymmetricBase> &&
-           std::derived_from<Matrix<N, N, T2, S2>, SymmetricBase>
-constexpr auto operator+(Matrix<N, N, T1, S1> const& x1,
-                         Matrix<N, N, T2, S2> const& x2) {
-  SymmetricMatrix<N, std::common_type_t<T1, T2>> result{x1};
-  result += x2;
-  return result;
-}
-
-template <size_t N, typename T1, typename T2>
-constexpr auto operator+(DiagonalMatrix<N, T1> const& x1,
-                         DiagonalMatrix<N, T2> const& x2) {
-  DiagonalMatrix<N, std::common_type_t<T1, T2>> result{x1};
-  result += x2;
-  return result;
+template <MatrixConcept X1, MatrixConcept X2, typename value_type, size_t... Is>
+constexpr bool close(X1 const& x1, X2 const& x2, value_type threshold,
+                     std::index_sequence<Is...>) {
+  return (... && (RowAt<Is>::close(x1, x2, threshold,
+                                   std::make_index_sequence<X1::columns>{})));
 }
 
 template <MatrixConcept X1, MatrixConcept X2>
   requires(X1::rows == X2::rows && X1::columns == X2::columns)
-constexpr auto operator-(X1 const& x1, X2 const& x2) {
-  Matrix<X1::rows, X1::columns,
-         std::common_type_t<typename X1::value_type, typename X2::value_type>>
-      result{x1};
-  result -= x2;
-  return result;
-}
-
-template <size_t N, typename T1, typename T2,
-          template <size_t, size_t, typename> typename S1,
-          template <size_t, size_t, typename> typename S2>
-  requires std::derived_from<Matrix<N, N, T1, S1>, SymmetricBase> &&
-           std::derived_from<Matrix<N, N, T2, S2>, SymmetricBase>
-constexpr auto operator-(Matrix<N, N, T1, S1> const& x1,
-                         Matrix<N, N, T2, S2> const& x2) {
-  SymmetricMatrix<N, std::common_type_t<T1, T2>> result{x1};
-  result -= x2;
-  return result;
-}
-
-template <size_t N, typename T1, typename T2>
-constexpr auto operator-(DiagonalMatrix<N, T1> const& x1,
-                         DiagonalMatrix<N, T2> const& x2) {
-  DiagonalMatrix<N, std::common_type_t<T1, T2>> result{x1};
-  result -= x2;
-  return result;
-}
-
-template <size_t N, size_t M, typename T,
-          template <size_t, size_t, typename> typename S, ScalarConcept V>
-  requires MutableMatrixConcept<Matrix<N, M, T, S>>
-constexpr auto operator*(Matrix<N, M, T, S> const& x, V const value) {
-  Matrix<N, M, T, S> result{x};
-  result *= value;
-  return result;
-}
-
-template <MatrixConcept X, ScalarConcept V>
-  requires std::derived_from<DiagonalBase, X>
-constexpr auto operator*(X const& x, V const value) {
-  DiagonalMatrix<X::rows, typename X::value_type> result{x};
-  result *= value;
-  return result;
-}
-
-template <MatrixConcept X, ScalarConcept V>
-constexpr auto operator*(X const& x, V const value) {
-  Matrix<X::rows, X::columns, typename X::value_type> result{x};
-  result *= value;
-  return result;
-}
-
-template <MatrixConcept X, ScalarConcept V>
-constexpr auto operator*(V const value, X const& x) {
-  return x * value;
-}
-
-template <MatrixConcept X1, MatrixConcept X2, size_t... Is>
-constexpr auto row_column_mul(X1 const& x1, X2 const& x2, size_t i, size_t j,
-                              std::index_sequence<Is...>) {
-  if constexpr (sizeof...(Is) < 32) {
-    return (... + (x1[i, Is] * x2[Is, j]));
-  } else {
-    auto result = x1[i, 0] * x2[0, j];
-    for (size_t k = 1; k < sizeof...(Is); ++k) {
-      result += x1[i, k] * x2[k, j];
-    }
-    return result;
-  }
+constexpr bool
+all_close(X1 const& x1, X2 const& x2,
+          typename X1::value_type threshold =
+              1000 * std::numeric_limits<typename X1::value_type>::epsilon()) {
+  return close(x1, x2, threshold, std::make_index_sequence<X1::rows>{});
 }
 
 template <MatrixConcept X1, MatrixConcept X2>
-  requires(X1::columns == X2::rows)
-constexpr auto operator*(X1 const& x1, X2 const& x2) {
-  Matrix<X1::rows, X2::columns,
-         std::common_type_t<typename X1::value_type, typename X2::value_type>>
-      result;
-  for (size_t i = 0; i < X1::rows; ++i) {
-    for (size_t j = 0; j < X2::columns; ++j) {
-      result[i, j] = x1[i, 0] * x2[0, j];
-      for (size_t k = 1; k < X1::columns; ++k) {
-        result[i, j] += x1[i, k] * x2[k, j];
-      }
-    }
-  }
-  return result;
+  requires(noref<X1>::rows == noref<X2>::rows &&
+           noref<X1>::columns == noref<X2>::columns)
+constexpr auto operator+(X1&& x1, X2&& x2) {
+  return MatrixAddition<X1, X2>{std::forward<X1>(x1), std::forward<X2>(x2)};
 }
 
-#ifndef __clang__
-template <size_t N, size_t K, size_t M, typename T1, typename T2>
-constexpr auto operator*(Matrix<N, K, T1> const& x1,
-                         Matrix<K, M, T2> const& x2) {
-  Matrix<N, M, std::common_type_t<T1, T2>> result;
-  for (size_t i = 0; i < N; ++i) {
-    for (size_t j = 0; j < M; ++j) {
-      result[i, j] =
-          row_column_mul(x1, x2, i, j, std::make_index_sequence<K>{});
-    }
-  }
-  return result;
+template <MatrixConcept X1, MatrixConcept X2>
+  requires(noref<X1>::rows == noref<X2>::rows &&
+           noref<X1>::columns == noref<X2>::columns)
+constexpr auto operator-(X1&& x1, X2&& x2) {
+  return MatrixSubtraction<X1, X2>{std::forward<X1>(x1), std::forward<X2>(x2)};
 }
-#endif
+
+template <MatrixConcept X, ScalarConcept S>
+constexpr auto operator*(X&& x, S const value) {
+  return MatrixScalarMultiplication<X, S>{std::forward<X>(x), value};
+}
+
+template <MatrixConcept X, ScalarConcept S>
+constexpr auto operator*(S const value, X&& x) {
+  return std::forward<X>(x) * value;
+}
+
+template <MatrixConcept X, VectorConcept V>
+  requires(noref<X>::columns == noref<V>::components)
+constexpr auto operator*(X&& x, V&& v) {
+  return MatrixVectorMultiplication<X, V, false>{std::forward<X>(x),
+                                                 std::forward<V>(v)};
+}
+
+template <MatrixConcept X, VectorConcept V>
+  requires(noref<X>::rows == noref<V>::components)
+constexpr auto operator*(V&& v, X&& x) {
+  return MatrixVectorMultiplication<X, V, true>{std::forward<X>(x),
+                                                std::forward<V>(v)};
+}
+
+template <MatrixConcept X1, MatrixConcept X2>
+  requires(noref<X1>::columns == noref<X2>::rows)
+constexpr auto operator*(X1&& x1, X2&& x2) {
+  return MatrixMultiplication<X1, X2>{std::forward<X1>(x1),
+                                      std::forward<X2>(x2)};
+}
 
 #ifdef HAVE_BLAS
 template <size_t N, size_t K, size_t M>
@@ -567,74 +671,6 @@ constexpr auto blas_mul(GenericStorage<N, K, double> const& x1,
   return result;
 }
 #endif
-
-template <size_t N, typename T1, typename T2>
-constexpr auto operator*(SymmetricMatrix<N, T1> const& x1,
-                         SymmetricMatrix<N, T2> const& x2) {
-  SymmetricMatrix<N, std::common_type_t<T1, T2>> result;
-  for (size_t i = 0; i < N; ++i) {
-    for (size_t j = 0; j <= i; ++j) {
-      result[i, j] =
-          row_column_mul(x1, x2, i, j, std::make_index_sequence<N>{});
-    }
-  }
-  return result;
-}
-
-template <size_t N, typename T1, typename T2>
-constexpr auto operator*(DiagonalMatrix<N, T1> const& x1,
-                         DiagonalMatrix<N, T2> const& x2) {
-  DiagonalMatrix<N, std::common_type_t<T1, T2>> result;
-  for (size_t i = 0; i < N; ++i) {
-    result[i, i] = x1[i, i] * x2[i, i];
-  }
-  return result;
-}
-
-template <MatrixConcept X, VectorConcept V,
-          typename T = std::common_type_t<typename X::value_type,
-                                          typename V::value_type>>
-  requires(X::columns == V::components)
-constexpr auto operator*(X const& x, V const& v) {
-  Vector<X::rows, T> result;
-  for (size_t i = 0; i < X::rows; ++i) {
-    result[i] = x[i, 0] * v[0];
-    for (size_t j = 1; j < V::components; ++j) {
-      result[i] += x[i, j] * v[j];
-    }
-  }
-  return result;
-}
-
-template <MatrixConcept X, VectorConcept V,
-          typename T = std::common_type_t<typename X::value_type,
-                                          typename V::value_type>>
-  requires(X::rows == V::components)
-constexpr auto operator*(V const& v, X const& x) {
-  Vector<X::columns, T> result;
-  for (size_t i = 0; i < X::columns; ++i) {
-    result[i] = v[0] * x[0, i];
-    for (size_t j = 1; j < V::components; ++j) {
-      result[i] += v[j] * x[j, i];
-    }
-  }
-  return result;
-}
-
-template <MatrixConcept X1, MatrixConcept X2>
-  requires(X1::rows == X2::rows && X1::columns == X2::columns)
-constexpr bool
-all_close(X1 const& x1, X2 const& x2,
-          typename X1::value_type threshold =
-              1000 * std::numeric_limits<typename X1::value_type>::epsilon()) {
-  for (size_t i = 0; i < X1::rows; ++i) {
-    for (size_t j = 0; j < X1::columns; ++j) {
-      if (std::abs(x1[i, j] - x2[i, j]) > threshold)
-        return false;
-    }
-  }
-  return true;
-}
 
 template <size_t MinSize = 16>
   requires(MinSize > 0)

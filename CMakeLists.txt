@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.28)
 
 project(trix)
 
-if(NOT DEFINED ${CMAKE_BUILD_TYPE})
+if(NOT DEFINED CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE Release)
 endif()
+message(NOTICE "Building: ${CMAKE_BUILD_TYPE}")
 
 
 set(CMAKE_CXX_STANDARD 23)
@@ -19,6 +20,9 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmax-errors=1")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
     message(FATAL_ERROR "g++ 14 or new required. Set environment variable CXX to a newer g++")
+  endif()
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 16)
+    set(HAVE_CXX_MODULES 1)
   endif()
 endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -140,10 +144,12 @@ if(BUILD_TESTS)
       BLAS::BLAS
       trix_static
     )
-    target_sources(${NEW_TEST} PRIVATE 
-      FILE_SET cxx_modules TYPE CXX_MODULES
-      FILES ${module_sources}
-    )
+    if (DEFINED HAVE_CXX_MODULES)
+      target_sources(${NEW_TEST} PRIVATE 
+        FILE_SET cxx_modules TYPE CXX_MODULES
+        FILES ${module_sources}
+      )
+    endif()
     add_test(${NEW_TEST} tests/${NEW_TEST})
   endmacro()
 
@@ -178,8 +184,10 @@ if(BUILD_TESTS)
 
   new_test(test_vector)
   new_test(test_matrix)
-  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 15)
+  if (DEFINED HAVE_CXX_MODULES)
     new_test(test_module)
   endif()
-  new_benchmark(test_performance)
+  if (CMAKE_BUILD_TYPE MATCHES "Release")
+    new_benchmark(test_performance)
+  endif()
 endif()

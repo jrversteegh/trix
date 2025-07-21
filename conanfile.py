@@ -65,6 +65,7 @@ class TrixConan(ConanFile):
         tc.variables["BUILD_PYTHON"] = "0"
         tc.variables["BUILD_TESTS"] = "0"
         tc.variables["BUILD_SHARED"] = "1"
+        tc.variables["CMAKE_BUILD_TYPE"] = self.settings.build_type
         if self.settings.os == "Windows":
             tc.variables["CMAKE_POLICY_DEFAULT_CMP0091"] = "NEW"
         tc.generate()

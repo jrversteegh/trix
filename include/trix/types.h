@@ -9,6 +9,15 @@ template <typename T, typename... Ts>
 concept OneOf = (std::same_as<T, Ts> || ...);
 
 template <typename T>
+using noref = std::remove_reference_t<T>;
+
+template <typename T>
+using make_const =
+    std::conditional_t<std::is_lvalue_reference_v<T>,
+                       std::add_lvalue_reference_t<std::add_const_t<noref<T>>>,
+                       std::add_const_t<T>>;
+
+template <typename T>
 struct IndexIterator {
   using difference_type = typename T::value_type;
   using value_type = typename T::value_type;

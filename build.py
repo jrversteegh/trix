@@ -59,6 +59,8 @@ def dir_context(new_dir):
 
 
 def build_module(build_type, config=""):
+    if not build_type:
+        build_type = "Release"
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
     win_flags = "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW" if on_windows else ""
@@ -118,6 +120,7 @@ def build(setup_kwargs):
         if os.path.exists(script_dir / ".debug") or "DEBUG" in os.environ
         else "Release"
     )
+    print(f"Building: {build_type}")
     output_dir = build_dir / build_type if on_windows else build_dir
     build_module(build_type)
     ext_modules = [

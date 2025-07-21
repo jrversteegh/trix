@@ -58,8 +58,10 @@ auto get_random_diagonal() {
   return DiagonalMatrix<N>{IndexIterator{gen, 0}, IndexIterator{gen, N}};
 }
 
+template <size_t N = 10>
 auto get_random_vector() {
-  return vector(r(), r(), r(), r(), r(), r(), r(), r(), r(), r());
+  auto gen = RandomGenerator();
+  return Vector<N>(IndexIterator{gen, 0}, IndexIterator{gen, N});
 }
 
 static void benchmark_matrix_mul(benchmark::State& state) {
@@ -68,7 +70,7 @@ static void benchmark_matrix_mul(benchmark::State& state) {
   auto m2 = get_random_matrix();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    auto value = m1 * m2;
+    auto value = (m1 * m2)();
     benchmark::DoNotOptimize(value);
   }
 }
@@ -81,10 +83,10 @@ static void benchmark_eigen_mul(benchmark::State& state) {
   auto m2 = get_random_eigen();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    decltype(m1) value = m1 * m2;
+    auto value = static_cast<decltype(m1)>(m1 * m2);
     benchmark::DoNotOptimize(value);
   }
-  decltype(m1) value = m1 * m2;
+  auto value = static_cast<decltype(m1)>(m1 * m2);
   auto t1 = Matrix<m1.rows(), m1.cols()>{m1.data(), m1.data() + m1.size()};
   auto t2 = Matrix<m2.rows(), m2.cols()>{m2.data(), m2.data() + m2.size()};
   auto result = Matrix<value.rows(), value.cols()>{value.data(),
@@ -159,11 +161,23 @@ static void benchmark_vector_op_minus(benchmark::State& state) {
   auto v = get_random_vector();
   benchmark::DoNotOptimize(v);
   for (auto _ : state) {
-    auto value = -v;
+    decltype(v) value = -v;
     benchmark::DoNotOptimize(value);
   }
 }
 BENCHMARK(benchmark_vector_op_minus);
+
+static void benchmark_vector_op_cross(benchmark::State& state) {
+  auto v1 = get_random_vector<3>();
+  benchmark::DoNotOptimize(v1);
+  auto v2 = get_random_vector<3>();
+  benchmark::DoNotOptimize(v2);
+  for (auto _ : state) {
+    decltype(v1) value = cross(v1, v2);
+    benchmark::DoNotOptimize(value);
+  }
+}
+BENCHMARK(benchmark_vector_op_cross);
 
 static void benchmark_vector_equality(benchmark::State& state) {
   auto v1 = get_random_vector();
