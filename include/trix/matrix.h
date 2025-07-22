@@ -72,7 +72,8 @@ struct RectangularBase {};
 template <size_t N, size_t M>
 struct RectangularType : RectangularBase {
   template <typename F>
-    requires std::same_as<std::invoke_result_t<F, size_t, size_t>, void>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
   constexpr void for_each_element(F fun) {
     for (size_t i = 0; i < N; ++i) {
       for (size_t j = 0; j < M; ++j) {
@@ -88,7 +89,8 @@ template <size_t N>
 struct SymmetricType : SymmetricBase {
 
   template <typename F>
-    requires std::same_as<std::invoke_result_t<F, size_t, size_t>, void>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
   constexpr void for_each_element(F fun) {
     for (size_t i = 0; i < N; ++i) {
       for (size_t j = 0; j <= i; ++j) {
@@ -103,7 +105,8 @@ struct DiagonalBase : SymmetricBase {};
 template <size_t N>
 struct DiagonalType : DiagonalBase {
   template <typename F>
-    requires std::same_as<std::invoke_result_t<F, size_t, size_t>, void>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
   constexpr void for_each_element(F fun) {
     for (size_t i = 0; i < N; ++i) {
       fun(i, i);
@@ -185,9 +188,9 @@ struct GenericStorage
 template <size_t N, size_t M = N, typename T = Number>
   requires(M == N)
 struct SymmetricStorage
-    : MatrixArrayStorage<SymmetricStorage<N, M, T>, N, M, N*(N + 1) / 2, T>,
+    : MatrixArrayStorage<SymmetricStorage<N, N, T>, N, N, N*(N + 1) / 2, T>,
       SymmetricType<N> {
-  using MatrixArrayStorage<SymmetricStorage<N, M, T>, N, M, N*(N + 1) / 2,
+  using MatrixArrayStorage<SymmetricStorage<N, N, T>, N, N, N*(N + 1) / 2,
                            T>::MatrixArrayStorage;
   static constexpr size_t get_offset(size_t const i, size_t const j) {
     return i > j ? i * (i + 1) / 2 + j : j * (j + 1) / 2 + i;
@@ -245,7 +248,7 @@ struct RowAt {
             size_t... Js>
   static constexpr bool close(X1 const& x1, X2 const& x2, value_type threshold,
                               std::index_sequence<Js...>) {
-    return (... && (std::abs(x1[I, Js] - x2[I, Js]) > threshold));
+    return (... && (std::abs(x1[I, Js] - x2[I, Js]) < threshold));
   }
 };
 
@@ -268,16 +271,18 @@ template <MatrixConcept X1, MatrixConcept X2>
 using common_matrix_t = CommonMatrix<typename noref<X1>::result_type,
                                      typename noref<X2>::result_type>::type;
 
+struct ConstructorTag {};
+
 template <typename R>
 struct ResultType {
   using result_type = R;
   template <class Self>
   explicit constexpr operator result_type(this Self&& self) {
-    return result_type{self};
+    return result_type{std::forward<Self>(self), ConstructorTag{}};
   }
   template <class Self>
   constexpr auto operator()(this Self&& self) {
-    return static_cast<result_type>(self);
+    return static_cast<result_type>(std::forward<Self>(self));
   }
 };
 
@@ -287,23 +292,30 @@ struct MatrixUnaryOperation
       ResultType<R> {
   using arg_type = make_const<X>;
   MatrixUnaryOperation() = delete;
-  explicit constexpr MatrixUnaryOperation(X&& arg)
-      : arg{std::forward<X>(arg)} {}
+  template <typename U>
+  explicit constexpr MatrixUnaryOperation(U&& arg)
+      : arg{std::forward<U>(arg)} {}
   arg_type arg;
+};
+
+template <MatrixConcept X1, typename X2, typename R = common_matrix_t<X1, X2>>
+struct MatrixBinaryOperation : ResultType<R> {
+  using arg1_type = make_const<X1>;
+  using arg2_type = make_const<X2>;
+  MatrixBinaryOperation() = delete;
+  template <typename U1, typename U2>
+  constexpr MatrixBinaryOperation(U1&& arg1, U2&& arg2)
+      : arg1{std::forward<U1>(arg1)}, arg2{std::forward<U2>(arg2)} {}
+  arg1_type arg1;
+  arg2_type arg2;
 };
 
 template <MatrixConcept X1, MatrixConcept X2,
           typename R = common_matrix_t<X1, X2>>
-struct MatrixBinaryOperation
-    : MatrixStorageType<R::rows, R::columns, typename R::value_type>,
-      ResultType<R> {
-  using arg1_type = make_const<X1>;
-  using arg2_type = make_const<X2>;
-  MatrixBinaryOperation() = delete;
-  constexpr MatrixBinaryOperation(X1&& arg1, X2&& arg2)
-      : arg1{std::forward<X1>(arg1)}, arg2{std::forward<X2>(arg2)} {}
-  arg1_type arg1;
-  arg2_type arg2;
+struct MatrixMatrixOperation
+    : MatrixBinaryOperation<X1, X2, R>,
+      MatrixStorageType<R::rows, R::columns, typename R::value_type> {
+  using MatrixBinaryOperation<X1, X2, R>::MatrixBinaryOperation;
 };
 
 template <MatrixConcept X, VectorConcept V, bool reversed,
@@ -316,32 +328,18 @@ template <MatrixConcept X, VectorConcept V, bool reversed,
                      std::common_type_t<typename noref<X>::value_type,
                                         typename noref<V>::value_type>>>>
 struct MatrixVectorOperation
-    : VectorStorageType<R::components, typename R::value_type>,
-      ResultType<R> {
-  using arg1_type = make_const<X>;
-  using arg2_type = make_const<V>;
-  using result_type = R;
-  MatrixVectorOperation() = delete;
-  constexpr MatrixVectorOperation(X&& arg1, V&& arg2)
-      : arg1{std::forward<X>(arg1)}, arg2{std::forward<V>(arg2)} {}
-  arg1_type arg1;
-  arg2_type arg2;
+    : MatrixBinaryOperation<X, V, R>,
+      VectorStorageType<R::components, typename R::value_type> {
+  using MatrixBinaryOperation<X, V, R>::MatrixBinaryOperation;
 };
 
 template <MatrixConcept X, ScalarConcept S,
           typename R = typename noref<X>::result_type::template retyped<
               std::common_type_t<typename noref<X>::value_type, S>>>
 struct MatrixScalarOperation
-    : MatrixStorageType<R::rows, R::columns, typename R::value_type>,
-      ResultType<R> {
-  using arg1_type = make_const<X>;
-  using arg2_type = make_const<S>;
-  using result_type = R;
-  MatrixScalarOperation() = delete;
-  constexpr MatrixScalarOperation(X&& arg1, S const arg2)
-      : arg1{std::forward<X>(arg1)}, arg2{arg2} {}
-  arg1_type arg1;
-  arg2_type arg2;
+    : MatrixBinaryOperation<X, S, R>,
+      MatrixStorageType<R::rows, R::columns, typename R::value_type> {
+  using MatrixBinaryOperation<X, S, R>::MatrixBinaryOperation;
 };
 
 template <MatrixConcept X>
@@ -353,24 +351,24 @@ struct MatrixNegation : MatrixUnaryOperation<X> {
 };
 
 template <MatrixConcept X1, MatrixConcept X2>
-struct MatrixAddition : MatrixBinaryOperation<X1, X2> {
-  using MatrixBinaryOperation<X1, X2>::MatrixBinaryOperation;
+struct MatrixAddition : MatrixMatrixOperation<X1, X2> {
+  using MatrixMatrixOperation<X1, X2>::MatrixMatrixOperation;
   constexpr auto operator[](size_t const i, size_t const j) const {
     return this->arg1[i, j] + this->arg2[i, j];
   }
 };
 
 template <MatrixConcept X1, MatrixConcept X2>
-struct MatrixSubtraction : MatrixBinaryOperation<X1, X2> {
-  using MatrixBinaryOperation<X1, X2>::MatrixBinaryOperation;
+struct MatrixSubtraction : MatrixMatrixOperation<X1, X2> {
+  using MatrixMatrixOperation<X1, X2>::MatrixMatrixOperation;
   constexpr auto operator[](size_t const i, size_t const j) const {
     return this->arg1[i, j] - this->arg2[i, j];
   }
 };
 
 template <MatrixConcept X1, MatrixConcept X2>
-struct MatrixMultiplication : MatrixBinaryOperation<X1, X2> {
-  using MatrixBinaryOperation<X1, X2>::MatrixBinaryOperation;
+struct MatrixMultiplication : MatrixMatrixOperation<X1, X2> {
+  using MatrixMatrixOperation<X1, X2>::MatrixMatrixOperation;
   template <size_t... Ks>
   constexpr auto dot(size_t const i, size_t const j,
                      std::index_sequence<Ks...>) const {
@@ -411,8 +409,9 @@ struct MatrixScalarMultiplication : MatrixScalarOperation<X, S> {
 
 template <MatrixConcept X>
 struct MatrixView {
-  explicit constexpr MatrixView(X& x) : matrix{x} {};
-  X& matrix;
+  template <typename U>
+  explicit constexpr MatrixView(U&& x) : matrix{std::forward<U>(x)} {};
+  X matrix;
 };
 
 template <MatrixConcept X>
@@ -433,18 +432,18 @@ struct Transpose
 
 template <MatrixConcept X, size_t I, size_t J, size_t N, size_t M>
 struct SubMatrix : MatrixView<X>,
-                   MatrixStorageType<N, M, typename X::value_type>,
+                   MatrixStorageType<N, M, typename noref<X>::value_type>,
                    MatrixAssignment<N, M> {
   using MatrixView<X>::MatrixView;
   using MatrixAssignment<N, M>::operator=;
-  using result_type = typename X::result_type::template resized<N, M>;
+  using result_type = typename noref<X>::result_type::template resized<N, M>;
   constexpr auto& operator[](size_t const i, size_t const j) {
-    static typename X::value_type zero = 0;
+    static typename noref<X>::value_type zero = 0;
     assert(i < N);
     assert(j < M);
     size_t p = I + i;
     size_t q = J + j;
-    if (p < X::rows && q < X::columns) {
+    if (p < noref<X>::rows && q < noref<X>::columns) {
       return this->matrix[p, q];
     } else {
       return zero;
@@ -455,10 +454,10 @@ struct SubMatrix : MatrixView<X>,
     assert(j < M);
     size_t p = I + i;
     size_t q = J + j;
-    if (p < X::rows && q < X::columns) {
+    if (p < noref<X>::rows && q < noref<X>::columns) {
       return std::as_const(this->matrix)[p, q];
     } else {
-      return static_cast<typename X::value_type>(0);
+      return static_cast<typename noref<X>::value_type>(0);
     }
   }
 };
@@ -514,38 +513,43 @@ template <size_t N, size_t M, typename T,
           template <size_t, size_t, typename C> typename Storage>
   requires(N > 0 && M > 0)
 struct Matrix : Storage<N, M, T> {
-  using storage = Storage<N, M, T>;
-  using storage::storage;
+  using Storage<N, M, T>::Storage;
   using result_type = Matrix;
+
   template <size_t P, size_t Q>
   using resized = Matrix<P, Q, T, Storage>;
   template <typename V>
   using retyped = Matrix<N, M, V, Storage>;
   template <MatrixConcept O>
-  explicit constexpr Matrix(O const& other) : storage{} {
-    this->for_each_element(
-        [this, &other](size_t i, size_t j) { (*this)[i, j] = other[i, j]; });
+  explicit constexpr Matrix(
+      O const& other, [[maybe_unused]] ConstructorTag tag = ConstructorTag{}) {
+    this->for_each_element([this, &other](size_t const i, size_t const j) {
+      (*this)[i, j] = other[i, j];
+    });
   }
 
   template <MatrixConcept O>
     requires(O::rows == N && O::columns == M)
   constexpr Matrix& operator+=(O const& other) {
-    this->for_each_element(
-        [this, &other](size_t i, size_t j) { (*this)[i, j] += other[i, j]; });
+    this->for_each_element([this, &other](size_t const i, size_t const j) {
+      (*this)[i, j] += other[i, j];
+    });
     return *this;
   }
 
   template <MatrixConcept O>
     requires(O::rows == N && O::columns == M)
   constexpr Matrix& operator-=(O const& other) {
-    this->for_each_element(
-        [this, &other](size_t i, size_t j) { (*this)[i, j] -= other[i, j]; });
+    this->for_each_element([this, &other](size_t const i, size_t const j) {
+      (*this)[i, j] -= other[i, j];
+    });
     return *this;
   }
 
   constexpr Matrix& operator*=(ScalarConcept auto const value) {
-    this->for_each_element(
-        [this, value](size_t i, size_t j) { (*this)[i, j] *= value; });
+    this->for_each_element([this, value](size_t const i, size_t const j) {
+      (*this)[i, j] *= value;
+    });
     return *this;
   }
 
@@ -611,10 +615,12 @@ constexpr bool close(X1 const& x1, X2 const& x2, value_type threshold,
 
 template <MatrixConcept X1, MatrixConcept X2>
   requires(X1::rows == X2::rows && X1::columns == X2::columns)
-constexpr bool
-all_close(X1 const& x1, X2 const& x2,
-          typename X1::value_type threshold =
-              1000 * std::numeric_limits<typename X1::value_type>::epsilon()) {
+constexpr bool all_close(
+    X1 const& x1, X2 const& x2,
+    typename X1::value_type threshold =
+        1000 *
+        std::numeric_limits<std::common_type_t<
+            typename X1::value_type, typename X2::value_type>>::epsilon()) {
   return close(x1, x2, threshold, std::make_index_sequence<X1::rows>{});
 }
 
@@ -676,30 +682,31 @@ template <size_t MinSize = 16>
   requires(MinSize > 0)
 struct Strassen {
   template <MatrixConcept X1, MatrixConcept X2>
-    requires(X1::columns == X2::rows)
-  static constexpr auto operator()(X1 const& x1, X2 const& x2) {
-    if constexpr (X1::rows <= MinSize || X1::columns <= MinSize ||
-                  X2::columns <= MinSize) {
-      return x1 * x2;
+    requires(noref<X1>::columns == noref<X2>::rows)
+  static constexpr auto operator()(X1&& x1, X2&& x2) {
+    if constexpr (noref<X1>::rows <= MinSize || noref<X1>::columns <= MinSize ||
+                  noref<X2>::columns <= MinSize) {
+      return std::forward<X1>(x1) * std::forward<X2>(x2);
     } else {
       static constexpr size_t N =
-          std::max((X1::rows + 1) / 2, (X1::columns + 1) / 2);
-      using result_type = Matrix<
-          X1::rows, X2::columns,
-          std::common_type_t<typename X1::value_type, typename X2::value_type>>;
+          std::max((noref<X1>::rows + 1) / 2, (noref<X1>::columns + 1) / 2);
+      using result_type =
+          Matrix<noref<X1>::rows, noref<X2>::columns,
+                 std::common_type_t<typename noref<X1>::value_type,
+                                    typename noref<X2>::value_type>>;
       result_type result;
-      auto a11 = SubMatrix<X1 const, 0, 0, N, N>{x1};
-      auto a12 = SubMatrix<X1 const, 0, N, N, N>{x1};
-      auto a21 = SubMatrix<X1 const, N, 0, N, N>{x1};
-      auto a22 = SubMatrix<X1 const, N, N, N, N>{x1};
-      auto b11 = SubMatrix<X2 const, 0, 0, N, N>{x2};
-      auto b12 = SubMatrix<X2 const, 0, N, N, N>{x2};
-      auto b21 = SubMatrix<X2 const, N, 0, N, N>{x2};
-      auto b22 = SubMatrix<X2 const, N, N, N, N>{x2};
-      auto r11 = SubMatrix<result_type, 0, 0, N, N>{result};
-      auto r12 = SubMatrix<result_type, 0, N, N, N>{result};
-      auto r21 = SubMatrix<result_type, N, 0, N, N>{result};
-      auto r22 = SubMatrix<result_type, N, N, N, N>{result};
+      auto a11 = SubMatrix<X1, 0, 0, N, N>{std::forward<X1>(x1)};
+      auto a12 = SubMatrix<X1, 0, N, N, N>{std::forward<X1>(x1)};
+      auto a21 = SubMatrix<X1, N, 0, N, N>{std::forward<X1>(x1)};
+      auto a22 = SubMatrix<X1, N, N, N, N>{std::forward<X1>(x1)};
+      auto b11 = SubMatrix<X2, 0, 0, N, N>{std::forward<X2>(x2)};
+      auto b12 = SubMatrix<X2, 0, N, N, N>{std::forward<X2>(x2)};
+      auto b21 = SubMatrix<X2, N, 0, N, N>{std::forward<X2>(x2)};
+      auto b22 = SubMatrix<X2, N, N, N, N>{std::forward<X2>(x2)};
+      auto r11 = SubMatrix<result_type&, 0, 0, N, N>{result};
+      auto r12 = SubMatrix<result_type&, 0, N, N, N>{result};
+      auto r21 = SubMatrix<result_type&, N, 0, N, N>{result};
+      auto r22 = SubMatrix<result_type&, N, N, N, N>{result};
       auto m1 = Strassen::operator()((a11 + a22), (b11 + b22));
       auto m2 = Strassen::operator()(a21 + a22, b11);
       auto m3 = Strassen::operator()(a11, b12 - b22);
@@ -718,30 +725,31 @@ template <size_t MinSize = 16>
   requires(MinSize > 0)
 struct BlockMul {
   template <MatrixConcept X1, MatrixConcept X2>
-    requires(X1::columns == X2::rows)
-  static constexpr auto operator()(X1 const& x1, X2 const& x2) {
-    if constexpr (X1::rows <= MinSize || X1::columns <= MinSize ||
-                  X2::columns <= MinSize) {
-      return x1 * x2;
+    requires(noref<X1>::columns == noref<X2>::rows)
+  static constexpr auto operator()(X1&& x1, X2&& x2) {
+    if constexpr (noref<X1>::rows <= MinSize || noref<X1>::columns <= MinSize ||
+                  noref<X2>::columns <= MinSize) {
+      return std::forward<X1>(x1) * std::forward<X2>(x2);
     } else {
       static constexpr size_t N =
-          std::max((X1::rows + 1) / 2, (X1::columns + 1) / 2);
-      using result_type = Matrix<
-          X1::rows, X2::columns,
-          std::common_type_t<typename X1::value_type, typename X2::value_type>>;
+          std::max((noref<X1>::rows + 1) / 2, (noref<X1>::columns + 1) / 2);
+      using result_type =
+          Matrix<noref<X1>::rows, noref<X2>::columns,
+                 std::common_type_t<typename noref<X1>::value_type,
+                                    typename noref<X2>::value_type>>;
       result_type result;
-      auto a11 = SubMatrix<X1 const, 0, 0, N, N>{x1};
-      auto a12 = SubMatrix<X1 const, 0, N, N, N>{x1};
-      auto a21 = SubMatrix<X1 const, N, 0, N, N>{x1};
-      auto a22 = SubMatrix<X1 const, N, N, N, N>{x1};
-      auto b11 = SubMatrix<X2 const, 0, 0, N, N>{x2};
-      auto b12 = SubMatrix<X2 const, 0, N, N, N>{x2};
-      auto b21 = SubMatrix<X2 const, N, 0, N, N>{x2};
-      auto b22 = SubMatrix<X2 const, N, N, N, N>{x2};
-      auto r11 = SubMatrix<result_type, 0, 0, N, N>{result};
-      auto r12 = SubMatrix<result_type, 0, N, N, N>{result};
-      auto r21 = SubMatrix<result_type, N, 0, N, N>{result};
-      auto r22 = SubMatrix<result_type, N, N, N, N>{result};
+      auto a11 = SubMatrix<X1, 0, 0, N, N>{std::forward<X1>(x1)};
+      auto a12 = SubMatrix<X1, 0, N, N, N>{std::forward<X1>(x1)};
+      auto a21 = SubMatrix<X1, N, 0, N, N>{std::forward<X1>(x1)};
+      auto a22 = SubMatrix<X1, N, N, N, N>{std::forward<X1>(x1)};
+      auto b11 = SubMatrix<X2, 0, 0, N, N>{std::forward<X2>(x2)};
+      auto b12 = SubMatrix<X2, 0, N, N, N>{std::forward<X2>(x2)};
+      auto b21 = SubMatrix<X2, N, 0, N, N>{std::forward<X2>(x2)};
+      auto b22 = SubMatrix<X2, N, N, N, N>{std::forward<X2>(x2)};
+      auto r11 = SubMatrix<result_type&, 0, 0, N, N>{result};
+      auto r12 = SubMatrix<result_type&, 0, N, N, N>{result};
+      auto r21 = SubMatrix<result_type&, N, 0, N, N>{result};
+      auto r22 = SubMatrix<result_type&, N, N, N, N>{result};
       r11 = BlockMul::operator()(a11, b11) + BlockMul::operator()(a12, b21);
       r12 = BlockMul::operator()(a11, b12) + BlockMul::operator()(a12, b22);
       r21 = BlockMul::operator()(a21, b11) + BlockMul::operator()(a22, b21);

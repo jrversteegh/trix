@@ -116,7 +116,9 @@ struct SymmetricMatrixFixture {
 
   Matrix<3, 3> square_multiplied{symmetric_multiplied};
 
-  SymmetricMatrix<3> symmetric_added{2 * symmetric};
+  MatrixScalarMultiplication<SymmetricMatrix<3>&, int> twice_symmetric =
+      2 * symmetric;
+  SymmetricMatrix<3> symmetric_added{twice_symmetric};
   Matrix<3, 3> square_added{symmetric_added};
 
   SymmetricMatrix<3> symmetric_zero{};
@@ -124,9 +126,9 @@ struct SymmetricMatrixFixture {
 };
 
 BOOST_FIXTURE_TEST_CASE(matrix_construction_helper_test,
-                        SymmetricMatrixFixture){
-    // auto r = matrix(1.0, 2.0, 3.0, 2.0, 3.0, 4.0, 3.0, 4.0, 5.0);
-    // BOOST_TEST(r == symmetric);
+                        SymmetricMatrixFixture) {
+  auto r = matrix(1.0, 2.0, 3.0, 2.0, 3.0, 4.0, 3.0, 4.0, 5.0);
+  BOOST_TEST(r == symmetric);
 };
 
 template <typename ARG1, typename ARG2>

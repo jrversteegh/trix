@@ -83,10 +83,10 @@ static void benchmark_eigen_mul(benchmark::State& state) {
   auto m2 = get_random_eigen();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    auto value = static_cast<decltype(m1)>(m1 * m2);
+    decltype(m1) value = m1 * m2;
     benchmark::DoNotOptimize(value);
   }
-  auto value = static_cast<decltype(m1)>(m1 * m2);
+  decltype(m1) value = m1 * m2;
   auto t1 = Matrix<m1.rows(), m1.cols()>{m1.data(), m1.data() + m1.size()};
   auto t2 = Matrix<m2.rows(), m2.cols()>{m2.data(), m2.data() + m2.size()};
   auto result = Matrix<value.rows(), value.cols()>{value.data(),
@@ -115,7 +115,7 @@ static void benchmark_symmetric_mul(benchmark::State& state) {
   auto m2 = get_random_symmetric();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    auto value = m1 * m2;
+    auto value = (m1 * m2)();
     benchmark::DoNotOptimize(value);
   }
 }
@@ -139,7 +139,7 @@ static void benchmark_diagonal_mul(benchmark::State& state) {
   auto m2 = get_random_diagonal();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    auto value = m1 * m2;
+    auto value = (m1 * m2)();
     benchmark::DoNotOptimize(value);
   }
 }
@@ -161,7 +161,7 @@ static void benchmark_vector_op_minus(benchmark::State& state) {
   auto v = get_random_vector();
   benchmark::DoNotOptimize(v);
   for (auto _ : state) {
-    decltype(v) value = -v;
+    auto value = (-v)();
     benchmark::DoNotOptimize(value);
   }
 }
@@ -173,7 +173,7 @@ static void benchmark_vector_op_cross(benchmark::State& state) {
   auto v2 = get_random_vector<3>();
   benchmark::DoNotOptimize(v2);
   for (auto _ : state) {
-    decltype(v1) value = cross(v1, v2);
+    auto value = cross(v1, v2)();
     benchmark::DoNotOptimize(value);
   }
 }
@@ -185,7 +185,7 @@ static void benchmark_vector_equality(benchmark::State& state) {
   auto v2 = v1;
   benchmark::DoNotOptimize(v2);
   for (auto _ : state) {
-    auto value = v1 == v2;
+    bool value = v1 == v2;
     benchmark::DoNotOptimize(value);
   }
 }
@@ -200,7 +200,7 @@ static void benchmark_matrix_star_operator(benchmark::State& state) {
   assert(!all_close(m1, m2, 1E-10));
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    auto value = m1 * m2;
+    auto value = (m1 * m2)();
     benchmark::DoNotOptimize(value);
   }
 }
