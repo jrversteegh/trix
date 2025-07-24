@@ -298,10 +298,29 @@ struct MatrixUnaryOperation
   arg_type arg;
 };
 
-template <MatrixConcept X1, typename X2, typename R = common_matrix_t<X1, X2>>
+template <typename T>
+struct UseResult {
+  using type = T;
+};
+
+template <typename T>
+  requires MatrixConcept<T> || VectorConcept<T>
+struct UseResult<T> {
+  using type = std::conditional_t<
+      std::is_same_v<noref<T>, typename noref<T>::result_type>, T,
+      typename noref<T>::result_type>;
+};
+
+template <typename T>
+using use_result_t = UseResult<T>::type;
+
+template <MatrixConcept X1, typename X2, typename R,
+          bool evaluate_intermediates = false>
 struct MatrixBinaryOperation : ResultType<R> {
-  using arg1_type = make_const<X1>;
-  using arg2_type = make_const<X2>;
+  using arg1_type = make_const<
+      std::conditional_t<evaluate_intermediates, use_result_t<X1>, X1>>;
+  using arg2_type = make_const<
+      std::conditional_t<evaluate_intermediates, use_result_t<X2>, X2>>;
   MatrixBinaryOperation() = delete;
   template <typename U1, typename U2>
   constexpr MatrixBinaryOperation(U1&& arg1, U2&& arg2)
@@ -311,11 +330,13 @@ struct MatrixBinaryOperation : ResultType<R> {
 };
 
 template <MatrixConcept X1, MatrixConcept X2,
+          bool evaluate_intermediates = false,
           typename R = common_matrix_t<X1, X2>>
 struct MatrixMatrixOperation
-    : MatrixBinaryOperation<X1, X2, R>,
+    : MatrixBinaryOperation<X1, X2, R, evaluate_intermediates>,
       MatrixStorageType<R::rows, R::columns, typename R::value_type> {
-  using MatrixBinaryOperation<X1, X2, R>::MatrixBinaryOperation;
+  using MatrixBinaryOperation<X1, X2, R,
+                              evaluate_intermediates>::MatrixBinaryOperation;
 };
 
 template <MatrixConcept X, VectorConcept V, bool reversed,
@@ -367,16 +388,24 @@ struct MatrixSubtraction : MatrixMatrixOperation<X1, X2> {
 };
 
 template <MatrixConcept X1, MatrixConcept X2>
-struct MatrixMultiplication : MatrixMatrixOperation<X1, X2> {
-  using MatrixMatrixOperation<X1, X2>::MatrixMatrixOperation;
-  template <size_t... Ks>
-  constexpr auto dot(size_t const i, size_t const j,
-                     std::index_sequence<Ks...>) const {
-    return ((this->arg1[i, Ks] * this->arg2[Ks, j]) + ...);
+struct MatrixMultiplication : MatrixMatrixOperation<X1, X2, true> {
+  using MatrixMatrixOperation<X1, X2, true>::MatrixMatrixOperation;
+  template <size_t I, size_t J, size_t... Ks>
+  constexpr auto dot(std::index_sequence<Ks...>) const {
+    return ((this->arg1[I, Ks] * this->arg2[Ks, J]) + ...);
+  }
+
+  template <size_t I, size_t J>
+  constexpr auto get() const {
+    return dot<I, J>(std::make_index_sequence<noref<X1>::columns>{});
   }
 
   constexpr auto operator[](size_t const i, size_t const j) const {
-    return dot(i, j, std::make_index_sequence<noref<X1>::columns>{});
+    auto result = this->arg1[i, 0] * this->arg2[0, j];
+    for (size_t k = 1; k < noref<X1>::columns; ++k) {
+      result += this->arg1[i, k] * this->arg2[k, j];
+    }
+    return result;
   }
 };
 
@@ -686,7 +715,7 @@ struct Strassen {
   static constexpr auto operator()(X1&& x1, X2&& x2) {
     if constexpr (noref<X1>::rows <= MinSize || noref<X1>::columns <= MinSize ||
                   noref<X2>::columns <= MinSize) {
-      return std::forward<X1>(x1) * std::forward<X2>(x2);
+      return (std::forward<X1>(x1) * std::forward<X2>(x2))();
     } else {
       static constexpr size_t N =
           std::max((noref<X1>::rows + 1) / 2, (noref<X1>::columns + 1) / 2);
@@ -729,7 +758,7 @@ struct BlockMul {
   static constexpr auto operator()(X1&& x1, X2&& x2) {
     if constexpr (noref<X1>::rows <= MinSize || noref<X1>::columns <= MinSize ||
                   noref<X2>::columns <= MinSize) {
-      return std::forward<X1>(x1) * std::forward<X2>(x2);
+      return (std::forward<X1>(x1) * std::forward<X2>(x2))();
     } else {
       static constexpr size_t N =
           std::max((noref<X1>::rows + 1) / 2, (noref<X1>::columns + 1) / 2);
