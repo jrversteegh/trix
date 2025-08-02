@@ -70,7 +70,7 @@ static void benchmark_matrix_mul(benchmark::State& state) {
   auto m2 = get_random_matrix();
   benchmark::DoNotOptimize(m2);
   for (auto _ : state) {
-    auto value = (m1 * m2)();
+    decltype(m1) value = m1 * m2;
     benchmark::DoNotOptimize(value);
   }
 }

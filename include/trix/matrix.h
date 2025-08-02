@@ -67,10 +67,31 @@ struct MatrixAssignment {
   }
 };
 
-struct RectangularBase {};
+struct RectangularBase {
+  constexpr void for_each(auto fun) {
+    for_each_row(fun, std::make_index_sequence<N>{});
+  }
+};
+
+template <size_t I>
+struct Index {};
+
+template <template <size_t, size_t> typename F>
+struct FunWrap {};
 
 template <size_t N, size_t M>
 struct RectangularType : RectangularBase {
+  template <size_t I, size_t... Js>
+  constexpr void for_each_column(auto fun, Index<I>,
+                                 std::index_sequence<Js...>) {
+    (fun.template operator()<I, Js>(), ...);
+  }
+
+  template <size_t... Is>
+  constexpr void for_each_row(auto fun, std::index_sequence<Is...>) {
+    (for_each_column(fun, Index<Is>{}, std::make_index_sequence<M>{}), ...);
+  }
+
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
                           void>
@@ -87,6 +108,20 @@ struct SymmetricBase : RectangularBase {};
 
 template <size_t N>
 struct SymmetricType : SymmetricBase {
+  template <size_t I, size_t... Js>
+  constexpr void for_each_column([[maybe_unused]] auto fun, Index<I>,
+                                 std::index_sequence<Js...>) {
+    (fun.template operator()<I, Js>(), ...);
+  }
+
+  template <size_t... Is>
+  constexpr void for_each_row(auto fun, std::index_sequence<Is...>) {
+    (for_each_column(fun, Index<Is>{}, std::make_index_sequence<Is>{}), ...);
+  }
+
+  constexpr void for_each(auto fun) {
+    for_each_row(fun, std::make_index_sequence<N>{});
+  }
 
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
@@ -104,6 +139,14 @@ struct DiagonalBase : SymmetricBase {};
 
 template <size_t N>
 struct DiagonalType : DiagonalBase {
+  template <size_t... Is>
+  constexpr void for_each_row(auto fun, std::index_sequence<Is...>) {
+    (fun.template operator()<Is, Is>(), ...);
+  }
+
+  constexpr void for_each(auto fun) {
+    for_each_row(fun, std::make_index_sequence<N>{});
+  }
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
                           void>
@@ -144,6 +187,21 @@ struct MatrixArrayStorage : MatrixStorageType<N, M, T> {
   constexpr T& operator[](size_t const i, size_t const j) {
     return a_[check_and_get_offset_(i, j)];
   }
+
+  template <size_t I, size_t J>
+  constexpr T get() const {
+    static_assert(I < N, "Expected I < N");
+    static_assert(J < M, "Expected J < M");
+    return a_[Impl::get_offset(I, J)];
+  }
+
+  template <size_t I, size_t J>
+  constexpr void set(T const value) {
+    static_assert(I < N, "Expected I < N");
+    static_assert(J < M, "Expected J < M");
+    a_[Impl::get_offset(I, J)] = value;
+  }
+
   constexpr size_t size() const {
     return elements;
   }
@@ -277,7 +335,7 @@ template <typename R>
 struct ResultType {
   using result_type = R;
   template <class Self>
-  explicit constexpr operator result_type(this Self&& self) {
+  constexpr operator result_type(this Self&& self) {
     return result_type{std::forward<Self>(self), ConstructorTag{}};
   }
   template <class Self>
@@ -367,7 +425,12 @@ template <MatrixConcept X>
 struct MatrixNegation : MatrixUnaryOperation<X> {
   using MatrixUnaryOperation<X>::MatrixUnaryOperation;
   constexpr auto operator[](size_t const i, size_t const j) const {
-    return -(this->arg[i, j]);
+    return -this->arg[i, j];
+  }
+
+  template <size_t I, size_t J>
+  constexpr auto get() const {
+    return -this->template get<I, J>();
   }
 };
 
@@ -377,6 +440,11 @@ struct MatrixAddition : MatrixMatrixOperation<X1, X2> {
   constexpr auto operator[](size_t const i, size_t const j) const {
     return this->arg1[i, j] + this->arg2[i, j];
   }
+
+  template <size_t I, size_t J>
+  constexpr auto get() const {
+    return this->arg1.template get<I, J>() + this->arg2.template get<I, J>();
+  }
 };
 
 template <MatrixConcept X1, MatrixConcept X2>
@@ -385,6 +453,10 @@ struct MatrixSubtraction : MatrixMatrixOperation<X1, X2> {
   constexpr auto operator[](size_t const i, size_t const j) const {
     return this->arg1[i, j] - this->arg2[i, j];
   }
+  template <size_t I, size_t J>
+  constexpr auto get() const {
+    return this->arg1.template get<I, J>() - this->arg2.template get<I, J>();
+  }
 };
 
 template <MatrixConcept X1, MatrixConcept X2>
@@ -392,7 +464,9 @@ struct MatrixMultiplication : MatrixMatrixOperation<X1, X2, true> {
   using MatrixMatrixOperation<X1, X2, true>::MatrixMatrixOperation;
   template <size_t I, size_t J, size_t... Ks>
   constexpr auto dot(std::index_sequence<Ks...>) const {
-    return ((this->arg1[I, Ks] * this->arg2[Ks, J]) + ...);
+    return (
+        (this->arg1.template get<I, Ks>() * this->arg2.template get<Ks, J>()) +
+        ...);
   }
 
   template <size_t I, size_t J>
@@ -434,6 +508,10 @@ struct MatrixScalarMultiplication : MatrixScalarOperation<X, S> {
   constexpr auto operator[](size_t const i, size_t const j) const {
     return this->arg1[i, j] * this->arg2;
   }
+  template <size_t I, size_t J>
+  constexpr auto get() const {
+    return this->arg1.template get<I, J>() * this->arg2;
+  }
 };
 
 template <MatrixConcept X>
@@ -456,6 +534,15 @@ struct Transpose
   }
   constexpr auto operator[](size_t const i, size_t const j) const {
     return this->matrix[j, i];
+  }
+  template <size_t I, size_t J>
+  constexpr auto get() const {
+    return this->matrix.template get<J, I>();
+  }
+
+  template <size_t I, size_t J>
+  void set(typename X::value_type const value) {
+    this->matrix.template set<J, I>(value);
   }
 };
 
@@ -487,6 +574,29 @@ struct SubMatrix : MatrixView<X>,
       return std::as_const(this->matrix)[p, q];
     } else {
       return static_cast<typename noref<X>::value_type>(0);
+    }
+  }
+
+  template <size_t P, size_t Q>
+  constexpr auto get() const {
+    static_assert(P < N, "Expected P < N");
+    static_assert(Q < M, "Expected Q < M");
+    constexpr auto R = P + I;
+    constexpr auto C = Q + J;
+    if constexpr (R < noref<X>::rows && C < noref<X>::columns) {
+      return this->matrix.template get<R, C>();
+    } else {
+      return static_cast<typename noref<X>::value_type>(0);
+    }
+  }
+  template <size_t P, size_t Q>
+  constexpr void set(typename noref<X>::value_type value) {
+    static_assert(P < N, "Expected P < N");
+    static_assert(Q < M, "Expected Q < M");
+    constexpr auto R = P + I;
+    constexpr auto C = Q + J;
+    if constexpr (R < noref<X>::rows && C < noref<X>::columns) {
+      this->matrix.template set<R, C>(value);
     }
   }
 };
@@ -549,12 +659,19 @@ struct Matrix : Storage<N, M, T> {
   using resized = Matrix<P, Q, T, Storage>;
   template <typename V>
   using retyped = Matrix<N, M, V, Storage>;
+
   template <MatrixConcept O>
   explicit constexpr Matrix(
       O const& other, [[maybe_unused]] ConstructorTag tag = ConstructorTag{}) {
-    this->for_each_element([this, &other](size_t const i, size_t const j) {
-      (*this)[i, j] = other[i, j];
-    });
+    if constexpr (N * M <= 36) {
+      this->for_each([this, &other]<size_t I, size_t J>() {
+        this->template set<I, J>(other.template get<I, J>());
+      });
+    } else {
+      this->for_each_element([this, &other](size_t const i, size_t const j) {
+        (*this)[i, j] = other[i, j];
+      });
+    }
   }
 
   template <MatrixConcept O>
