@@ -24,7 +24,7 @@
 #include <mkl.h>
 #define HAVE_BLAS 1
 #elif defined(HAVE_OPENBLAS)
-#include <cblas.h>
+#include <openblas/cblas.h>
 #define HAVE_BLAS 1
 #else
 #warning "No BLAS available"
