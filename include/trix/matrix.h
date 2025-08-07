@@ -225,9 +225,19 @@ struct MatrixArrayStorage : MatrixStorageType<N, M, T> {
 
 private:
   std::array<T, elements> a_{};
+  static constexpr auto get_array_offsets() {
+    std::array<std::array<size_t, M>, N> result{};
+    for (size_t i = 0; i < N; ++i) {
+      for (size_t j = 0; j < M; ++j) {
+        result[i][j] = Impl::get_offset(i, j);
+      }
+    }
+  }
+
+  static constexpr auto offsets = get_array_offsets();
   static constexpr size_t check_and_get_offset_(size_t const i,
                                                 size_t const j) {
-    size_t offset = Impl::get_offset(i, j);
+    size_t offset = offsets[i][j];
     assert(offset < elements);
     return offset;
   }
@@ -242,6 +252,7 @@ struct GenericStorage
   static constexpr size_t get_offset(size_t const i, size_t const j) {
     return i * M + j;
   }
+
 
 #ifdef HAVE_BLAS
   template <size_t K>
