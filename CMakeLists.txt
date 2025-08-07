@@ -11,7 +11,9 @@ message(NOTICE "Building: ${CMAKE_BUILD_TYPE}")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+if(BUILD_MARCH)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${BUILD_MARCH}")
+endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g3")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
@@ -84,10 +86,6 @@ configure_file(${CMAKE_SOURCE_DIR}/cmake/CMakeSettings.json.in ${CMAKE_SOURCE_DI
 endif()
 
 include_directories(
-  ${Boost_INCLUDE_DIR}
-  ${pybind11_INCLUDE_DIR}
-  ${fmt_INCLUDE_DIR}
-  ${EIGEN3_INCLUDE_DIR}
   ${TRIX_INCLUDE_DIR}
 )
 add_compile_definitions(
@@ -100,6 +98,10 @@ FILE(GLOB module_sources src/*.cppm)
 add_library(trix OBJECT ${lib_sources})
 message("Module output directory: ${MODULE_OUTPUT_DIR}")
 set_target_properties(trix PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${MODULE_OUTPUT_DIR})
+target_link_libraries(trix PRIVATE
+  BLAS::BLAS
+  fmt::fmt
+)
 if(BUILD_SHARED)
   set_property(TARGET trix PROPERTY POSITION_INDEPENDENT_CODE ON)
   add_library(trix_shared SHARED $<TARGET_OBJECTS:trix>)
@@ -109,6 +111,10 @@ add_library(trix_static STATIC $<TARGET_OBJECTS:trix>)
 set_target_properties(trix_static PROPERTIES OUTPUT_NAME trix)
 if(BUILD_PYTHON)
   pybind11_add_module(trixx MODULE ${TRIX_SOURCE_DIR}/trixx/binding.cpp ${lib_sources})
+  target_link_libraries(trixx PRIVATE
+    BLAS::BLAS
+    fmt::fmt
+  )
 endif()
 
 
@@ -141,6 +147,7 @@ if(BUILD_TESTS)
       Boost::log
       Boost::log_setup
       Boost::unit_test_framework
+      fmt::fmt
       BLAS::BLAS
       trix_static
     )
@@ -176,7 +183,9 @@ if(BUILD_TESTS)
       Boost::log
       Boost::log_setup
       Boost::unit_test_framework
+      fmt::fmt
       BLAS::BLAS
+      Eigen3::Eigen
       trix_static
     )
     add_test(${NEW_BENCHMARK} benchmarks/${NEW_BENCHMARK})

@@ -58,17 +58,19 @@ def dir_context(new_dir):
         os.chdir(previous_dir)
 
 
-def build_module(build_type, config=""):
+def build_module(build_type, config="", march=""):
     if not build_type:
         build_type = "Release"
     if os.path.exists(build_dir):
         shutil.rmtree(build_dir)
     win_flags = "-DCMAKE_POLICY_DEFAULT_CMP0091=NEW" if on_windows else ""
     config_flag = f"--config {build_type}" if on_windows else ""
+    march_define = f"-DBUILD_MARCH={march}" if march else ""
     version, date = get_project_version_and_date()
     with dir_context(build_dir):
+        # CMAKE flag required by bzip2. Remove when no longer necessary.
         if os.system(
-            f"conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} {script_dir}/conanfile.txt"
+            f"CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} {script_dir}/conanfile.txt"
         ):
             raise Exception("Failed to run conan")
         if os.system(
@@ -76,7 +78,7 @@ def build_module(build_type, config=""):
             f" -DVERSION={version} -DDATE={date} -DBUILD_PYTHON=1 -DBUILD_TESTS=1 -DBUILD_SHARED=1"
             f" -DCMAKE_CXX_COMPILER={compiler} -G Ninja"
             f" -DCMAKE_TOOLCHAIN_FILE=conan/conan_toolchain.cmake"
-            f"{config} {win_flags} {script_dir}"
+            f" {march_define} {config} {win_flags} {script_dir}"
         ):
             raise Exception("Failed to configure with cmake")
         if os.system(f"{cmake} --build . {config_flag} --verbose --parallel 4"):
@@ -122,7 +124,7 @@ def build(setup_kwargs):
     )
     print(f"Building: {build_type}")
     output_dir = build_dir / build_type if on_windows else build_dir
-    build_module(build_type)
+    build_module(build_type, march=os.environ["MARCH"] if "MARCH" in os.environ else "")
     ext_modules = [
         Extension(
             name="trixx",
