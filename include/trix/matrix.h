@@ -67,11 +67,7 @@ struct MatrixAssignment {
   }
 };
 
-struct RectangularBase {
-  constexpr void for_each(auto fun) {
-    for_each_row(fun, std::make_index_sequence<N>{});
-  }
-};
+struct RectangularBase {};
 
 template <size_t I>
 struct Index {};
@@ -81,6 +77,10 @@ struct FunWrap {};
 
 template <size_t N, size_t M>
 struct RectangularType : RectangularBase {
+  constexpr void for_each(auto fun) {
+    for_each_row(fun, std::make_index_sequence<N>{});
+  }
+
   template <size_t I, size_t... Js>
   constexpr void for_each_column(auto fun, Index<I>,
                                  std::index_sequence<Js...>) {
@@ -160,6 +160,18 @@ struct DiagonalType : DiagonalBase {
 template <typename Impl, size_t N, size_t M, size_t S, typename T = Number>
 struct MatrixArrayStorage : MatrixStorageType<N, M, T> {
   static constexpr size_t elements = S;
+  constexpr MatrixArrayStorage(MatrixArrayStorage const& other)
+      : a_{other.a_} {}
+  constexpr MatrixArrayStorage(MatrixArrayStorage&& other)
+      : a_{std::move(other.a_)} {}
+  constexpr MatrixArrayStorage& operator=(MatrixArrayStorage const& other) {
+    a_ = other.a_;
+    return *this;
+  }
+  constexpr MatrixArrayStorage& operator=(MatrixArrayStorage&& other) {
+    a_ = std::move(other.a_);
+    return *this;
+  }
   template <std::convertible_to<T>... Values>
   constexpr MatrixArrayStorage(Values&&... values)
       : a_{std::forward<Values>(values)...} {};
