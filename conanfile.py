@@ -48,6 +48,7 @@ class TrixConan(ConanFile):
     def requirements(self):
         self.requires("fmt/11.2.0")
         self.requires("openblas/0.3.30")
+        self.requires("eigen/3.4.0")
 
     def validate(self):
         compiler = self.settings.compiler
