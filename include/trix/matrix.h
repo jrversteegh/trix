@@ -67,6 +67,9 @@ struct MatrixAssignment {
   }
 };
 
+template <size_t I>
+struct Index {};
+
 struct RectangularBase {};
 
 template <size_t N, size_t M>
@@ -74,29 +77,60 @@ struct RectangularType : RectangularBase {
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
                           void>
-  constexpr void for_each_element(F fun) {
+  constexpr void for_each(F fun) {
     for (size_t i = 0; i < N; ++i) {
       for (size_t j = 0; j < M; ++j) {
         fun(i, j);
       }
     }
   }
+
+  template <typename F, size_t I, size_t... Js>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
+  constexpr void for_each_column(F fun, Index<I>, std::index_sequence<Js...>) {
+    (fun(I, Js), ...);
+  }
+  template <typename F, size_t... Is>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
+  constexpr void for_each_row(F fun, std::index_sequence<Is...>) {
+    (for_each_column(fun, Index<Is>{}, std::make_index_sequence<M>{}), ...);
+  }
+  /*
+
+  template <typename F>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
+  constexpr void for_each(F fun) {
+    for_each_row(fun, std::make_index_sequence<N>{});
+  }
+  */
 };
 
 struct SymmetricBase : RectangularBase {};
 
 template <size_t N>
 struct SymmetricType : SymmetricBase {
+  template <typename F, size_t I, size_t... Js>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
+  constexpr void for_each_column(F fun, Index<I>, std::index_sequence<Js...>) {
+    (fun(I, Js), ...);
+  }
+  template <typename F, size_t... Is>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
+  constexpr void for_each_row(F fun, std::index_sequence<Is...>) {
+    (for_each_column(fun, Index<Is>{}, std::make_index_sequence<Is + 1>{}),
+     ...);
+  }
 
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
                           void>
-  constexpr void for_each_element(F fun) {
-    for (size_t i = 0; i < N; ++i) {
-      for (size_t j = 0; j <= i; ++j) {
-        fun(i, j);
-      }
-    }
+  constexpr void for_each(F fun) {
+    for_each_row(fun, std::make_index_sequence<N>{});
   }
 };
 
@@ -107,7 +141,7 @@ struct DiagonalType : DiagonalBase {
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
                           void>
-  constexpr void for_each_element(F fun) {
+  constexpr void for_each(F fun) {
     for (size_t i = 0; i < N; ++i) {
       fun(i, i);
     }
@@ -217,7 +251,7 @@ struct DiagonalStorage
 
   template <typename F>
     requires std::same_as<std::invoke_result_t<F, size_t, size_t>, void>
-  constexpr void for_each_element(F fun) {
+  constexpr void for_each(F fun) {
     for (size_t i = 0; i < N; ++i) {
       fun(i, i);
     }
@@ -542,37 +576,33 @@ struct Matrix : Storage<N, M, T> {
   template <MatrixConcept O>
   explicit constexpr Matrix(
       O const& other, [[maybe_unused]] ConstructorTag tag = ConstructorTag{}) {
-    this->for_each_element(
-        [this, &other](size_t const i, size_t const j) constexpr {
-          (*this)[i, j] = other[i, j];
-        });
+    this->for_each([this, &other](size_t const i, size_t const j) constexpr {
+      (*this)[i, j] = other[i, j];
+    });
   }
 
   template <MatrixConcept O>
     requires(O::rows == N && O::columns == M)
   constexpr Matrix& operator+=(O const& other) {
-    this->for_each_element(
-        [this, &other](size_t const i, size_t const j) constexpr {
-          (*this)[i, j] += other[i, j];
-        });
+    this->for_each([this, &other](size_t const i, size_t const j) constexpr {
+      (*this)[i, j] += other[i, j];
+    });
     return *this;
   }
 
   template <MatrixConcept O>
     requires(O::rows == N && O::columns == M)
   constexpr Matrix& operator-=(O const& other) {
-    this->for_each_element(
-        [this, &other](size_t const i, size_t const j) constexpr {
-          (*this)[i, j] -= other[i, j];
-        });
+    this->for_each([this, &other](size_t const i, size_t const j) constexpr {
+      (*this)[i, j] -= other[i, j];
+    });
     return *this;
   }
 
   constexpr Matrix& operator*=(ScalarConcept auto const value) {
-    this->for_each_element(
-        [this, value](size_t const i, size_t const j) constexpr {
-          (*this)[i, j] *= value;
-        });
+    this->for_each([this, value](size_t const i, size_t const j) constexpr {
+      (*this)[i, j] *= value;
+    });
     return *this;
   }
 
