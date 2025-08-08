@@ -232,11 +232,12 @@ private:
         result[i][j] = Impl::get_offset(i, j);
       }
     }
+    return result;
   }
 
-  static constexpr auto offsets = get_array_offsets();
   static constexpr size_t check_and_get_offset_(size_t const i,
                                                 size_t const j) {
+    static constexpr auto offsets = get_array_offsets();
     size_t offset = offsets[i][j];
     assert(offset < elements);
     return offset;
@@ -252,7 +253,6 @@ struct GenericStorage
   static constexpr size_t get_offset(size_t const i, size_t const j) {
     return i * M + j;
   }
-
 
 #ifdef HAVE_BLAS
   template <size_t K>
