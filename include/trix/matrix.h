@@ -112,6 +112,19 @@ struct SymmetricBase : RectangularBase {};
 
 template <size_t N>
 struct SymmetricType : SymmetricBase {
+  /*
+  template <typename F>
+    requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
+                          void>
+  constexpr void for_each(F fun) {
+    for (size_t i = 0; i < N; ++i) {
+      for (size_t j = 0; j <= i; ++j) {
+        fun(i, j);
+      }
+    }
+  }
+  */
+
   template <typename F, size_t I, size_t... Js>
     requires std::same_as<std::invoke_result_t<F, size_t const, size_t const>,
                           void>

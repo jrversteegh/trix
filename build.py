@@ -22,6 +22,7 @@ else:
     compiler = "g++"
 
 on_windows = platform.system().startswith("Win")
+architecture = platform.machine()
 script_dir = Path(__file__).absolute().parent
 source_dir = script_dir / "src" / "trixx"
 trixx_dir = source_dir
@@ -70,7 +71,7 @@ def build_module(build_type, config="", march=""):
     with dir_context(build_dir):
         # CMAKE flag required by bzip2. Remove when no longer necessary.
         if os.system(
-            f"CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} {script_dir}/conanfile.txt"
+            f"CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} -s arch={architecture} {script_dir}/conanfile.txt"
         ):
             raise Exception("Failed to run conan")
         if os.system(

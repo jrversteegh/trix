@@ -8,11 +8,11 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+cmake = "4.2.3"
 
 
 [tool.poetry.group.dev.dependencies]
 invoke = "^2.2.0"
-cmake = "^4.0.2"
 sphinx = "^8.2.3"
 sphinx-rtd-theme = "^3.0.2"
 conan = "^2.17.0"
@@ -61,6 +61,6 @@ generate-setup-file = true
 
 
 [build-system]
-requires = ["poetry-core", "setuptools", "wheel", "cmake", "tomli", "gitpython", "conan"]
+requires = ["poetry-core", "setuptools", "wheel", "cmake==4.2.*", "tomli", "gitpython", "conan"]
 build-backend = "poetry.core.masonry.api"
 
