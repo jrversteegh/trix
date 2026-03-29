@@ -70,6 +70,13 @@ def build_module(build_type, config="", march=""):
     version, date = get_project_version_and_date()
     with dir_context(build_dir):
         # CMAKE flag required by bzip2. Remove when no longer necessary.
+        if architecture == "aarch64" or architecture == "arm64":
+            conan_arch = "armv8"
+        elif architecture.startwith("arm"):
+            conan_arch = "armv7hf"
+        else:
+            conan_arch = architeture
+        
         if os.system(
             f"CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} -s arch={architecture} {script_dir}/conanfile.txt"
         ):
