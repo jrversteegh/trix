@@ -76,9 +76,9 @@ def build_module(build_type, config="", march=""):
             conan_arch = "armv7hf"
         else:
             conan_arch = architeture
-        
+
         if os.system(
-            f"CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} -s arch={architecture} {script_dir}/conanfile.txt"
+            f"CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} -s arch={conan_arch} {script_dir}/conanfile.txt"
         ):
             raise Exception("Failed to run conan")
         if os.system(
