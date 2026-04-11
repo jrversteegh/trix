@@ -30,6 +30,7 @@ build_dir = script_dir / "build"
 python = sys.executable
 python_dir = Path(os.path.dirname(python))
 cmake = python_dir / "cmake"
+conan_dir = script_dir / "conan"
 
 
 def get_project_version_and_date():
@@ -68,17 +69,14 @@ def build_module(build_type, config="", march=""):
     config_flag = f"--config {build_type}" if on_windows else ""
     march_define = f"-DBUILD_MARCH={march}" if march else ""
     version, date = get_project_version_and_date()
+    if os.system(
+        f"CONAN_HOME={conan_dir} conan profile detect --force"
+    ):
+        raise Exception("Failed to configure conan")
     with dir_context(build_dir):
         # CMAKE flag required by bzip2. Remove when no longer necessary.
-        if architecture == "aarch64" or architecture == "arm64":
-            conan_arch = "armv8"
-        elif architecture.startwith("arm"):
-            conan_arch = "armv7hf"
-        else:
-            conan_arch = architeture
-
         if os.system(
-            f"CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install -of conan --profile={script_dir}/conan/trix.profile --build=missing -s build_type={build_type} -s arch={conan_arch} {script_dir}/conanfile.txt"
+            f"CONAN_HOME={conan_dir} CMAKE_POLICY_VERSION_MINIMUM=3.5 conan install -of conan --build=missing -s build_type={build_type} {script_dir}/conanfile.txt"
         ):
             raise Exception("Failed to run conan")
         if os.system(

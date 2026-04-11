@@ -9,6 +9,15 @@
 /CMakeUserPresets.json
 /src/trix/*.so
 /src/trixx/*.so
+/conan/.conan.db
+/conan/extensions/
+/conan/global.conf
+/conan/migrations/
+/conan/p/
+/conan/profiles/default
+/conan/remotes.json
+/conan/settings.yml
+/conan/version.txt
 
 __pycache__
 *.pyc

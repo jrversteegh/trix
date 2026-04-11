@@ -10,6 +10,7 @@ from invoke import task
 # Run from project root directory
 script_dir = Path(__file__).absolute().parent
 os.chdir(script_dir)
+conan_dir = script_dir / "conan"
 
 
 @task
@@ -81,9 +82,8 @@ def create_build_dir(ctx):
 def build(ctx):
     """Build"""
     for cmd in (
-        f"conan export {script_dir}/conan/recipes/openblas/all --version=0.3.30",
         "poetry build -vv",
-        f"conan create . --build=missing --profile={script_dir}/conan/trix.profile",
+        f"conan create . --build=missing --profile={conan_dir}/profiles/default",
     ):
         ctx.run(cmd, echo=True)
 
